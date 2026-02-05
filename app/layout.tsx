@@ -19,8 +19,8 @@ export const metadata: Metadata = {
   title: "ETB to Challenger",
   description: "Road to Challenger challenge tracker for Flex Queue",
   icons: {
-    icon: "/logo.svg",
-    apple: "/logo.svg",
+    icon: "/chall.png",
+    apple: "/chall.png",
   },
 };
 
