@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #09090b;
+  --foreground: #fafafa;
 }
 
 @theme inline {
@@ -12,15 +12,180 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* ─── Animations ─── */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+.animate-fade-in-scale {
+  animation: fade-in-scale 0.35s ease-out both;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.25s ease-out both;
+}
+
+/* Stagger children — apply to parent, each child gets increasing delay */
+.stagger-children > * {
+  animation: fade-in 0.4s ease-out both;
+}
+.stagger-children > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.stagger-children > *:nth-child(2) {
+  animation-delay: 60ms;
+}
+.stagger-children > *:nth-child(3) {
+  animation-delay: 120ms;
+}
+.stagger-children > *:nth-child(4) {
+  animation-delay: 180ms;
+}
+.stagger-children > *:nth-child(5) {
+  animation-delay: 240ms;
+}
+.stagger-children > *:nth-child(6) {
+  animation-delay: 300ms;
+}
+.stagger-children > *:nth-child(7) {
+  animation-delay: 360ms;
+}
+.stagger-children > *:nth-child(8) {
+  animation-delay: 420ms;
+}
+.stagger-children > *:nth-child(9) {
+  animation-delay: 480ms;
+}
+.stagger-children > *:nth-child(10) {
+  animation-delay: 540ms;
+}
+
+/* Stagger grid items — for card grids, table rows, list items */
+.stagger-grid > * {
+  animation: fade-in-scale 0.35s ease-out both;
+}
+.stagger-grid > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.stagger-grid > *:nth-child(2) {
+  animation-delay: 40ms;
+}
+.stagger-grid > *:nth-child(3) {
+  animation-delay: 80ms;
+}
+.stagger-grid > *:nth-child(4) {
+  animation-delay: 120ms;
+}
+.stagger-grid > *:nth-child(5) {
+  animation-delay: 160ms;
+}
+.stagger-grid > *:nth-child(6) {
+  animation-delay: 200ms;
+}
+.stagger-grid > *:nth-child(7) {
+  animation-delay: 240ms;
+}
+.stagger-grid > *:nth-child(8) {
+  animation-delay: 280ms;
+}
+.stagger-grid > *:nth-child(9) {
+  animation-delay: 320ms;
+}
+.stagger-grid > *:nth-child(10) {
+  animation-delay: 360ms;
+}
+.stagger-grid > *:nth-child(n + 11) {
+  animation-delay: 400ms;
+}
+
+/* Stagger rows — for table rows, list items */
+.stagger-rows > * {
+  animation: fade-in 0.3s ease-out both;
+}
+.stagger-rows > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.stagger-rows > *:nth-child(2) {
+  animation-delay: 30ms;
+}
+.stagger-rows > *:nth-child(3) {
+  animation-delay: 60ms;
+}
+.stagger-rows > *:nth-child(4) {
+  animation-delay: 90ms;
+}
+.stagger-rows > *:nth-child(5) {
+  animation-delay: 120ms;
+}
+.stagger-rows > *:nth-child(6) {
+  animation-delay: 150ms;
+}
+.stagger-rows > *:nth-child(7) {
+  animation-delay: 180ms;
+}
+.stagger-rows > *:nth-child(8) {
+  animation-delay: 210ms;
+}
+.stagger-rows > *:nth-child(9) {
+  animation-delay: 240ms;
+}
+.stagger-rows > *:nth-child(10) {
+  animation-delay: 270ms;
+}
+.stagger-rows > *:nth-child(n + 11) {
+  animation-delay: 300ms;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #18181b;
+}
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
 }

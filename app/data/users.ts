@@ -3,49 +3,49 @@ import { User } from "../types/user";
 export const users: User[] = [
   {
     puuid:
-      "Lew8f08JKDp8zuprECqsPOt53zc4rLSMTkeofDStoTBA9eVZfz9UiU766uThwsJscSLd7OyBvNI1dg",
+      "lFyi_2UFJ-PMBJ08NTvWFX9XkUWHRr_XWMm4b3-Pa0xUDSMagvDmBwvi5t_cQBYS01LD06jQMM7fhQ",
     gameName: "Kushinada Lucyna",
     tagLine: "ETB",
     region: "LA1",
   },
   {
     puuid:
-      "sHVqmm-xD140AU0hWwUf1orwnbQut2Wfcy-Esh_pcNlM4HJh-7JpdG-4-n9fdJeLcgRH-85wzGpq0Q",
+      "o-eueo_Rj3kNgxS_gsEGqe4NNpnDff7zkBVBegb2ExHZgcj9LAUmxD75drbOAytQ7zKJgF8qYX5Gmg",
     gameName: "Androw",
     tagLine: "ETB",
     region: "LA1",
   },
   {
     puuid:
-      "AUKeetCBg3Vy-_WziJ47aqmbB-apsoxq29EFqUtEF1lE4cESiSlgibyHujYDoH7BSdXV2Ot-2xA4oQ",
+      "11oD1XEZFGtPP3XbD5U6MwlXu8BCBl2y0J3WLBRGPfZ4IUT7Z2BuvF3Mg5HLl6KMSFkkp0ItuNeqZA",
     gameName: "Rukawa Kaede",
     tagLine: "ETB",
     region: "LA1",
   },
   {
     puuid:
-      "a7432Lk32kgnMXarkZUr102gVj9kjm5sNlWnhn-mWIqPJYF-I6cFpNfRgopN4Ppqt0NtjMxwad8Bww",
+      "CvuR8LbbBF1ZsbgVww1Db_c4dCNi_F-RSTaG__FPQEmhNthP3B4cieAmNBu-pdX-tNkM5iEt6LOQrg",
     gameName: "Bloomer",
     tagLine: "ETB",
     region: "LA1",
   },
   {
     puuid:
-      "I9MIDp6kqayQXdmlegU1EttXVi1a5zwSVSSUegfasQd69Rsjd3o6fICVdSMu8OcPClnBZp60JUZyvw",
+      "DTj7M1_aQ5JFUNJUTWgnA5oQNr-ugLzM2kzRwZw71zgd-n2R5x4gl0FKwpcT0JE-HlVbcDFhbVInHA",
     gameName: "StarboyXO",
     tagLine: "ETB",
     region: "LA1",
   },
   {
     puuid:
-      "iSiwseyhWvVyByjzc76ZJkKRbI-L8Iy7IfCKw4AhDJp12AzKnsUt8REPymtEC9zaRh96XRsz7fF2vg",
+      "BjkZo4bvEmVaIC4QP3zF8dVROR-wd18zRuykZq3PgjXj3f0LwgMm0eF6awBVrnUIJVBgKy4iR1hAdg",
     gameName: "7Fabian",
     tagLine: "ETB",
     region: "LA1",
   },
   {
     puuid:
-      "7MtBeRYv1zMMWKzH3jfAWRAq5dJP2SX4Qgb1NnoAdzu2JuI9c5gx4Is_Xr7RszRvaIxA",
+      "KtOzHG-noTJT6ZQIm41XZCzxxPUc-TrhJSOCBNyaclfwUvdzJ_SBzFMsVwFLXPIN9Zr_Hh53uUItqQ",
     gameName: "Trafalgar D Cam",
     tagLine: "ETB",
     region: "LA1",
