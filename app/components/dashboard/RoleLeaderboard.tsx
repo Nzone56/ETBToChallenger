@@ -104,7 +104,14 @@ export default function RoleLeaderboard({
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-semibold text-zinc-300">
+                  <span
+                    className={cn(
+                      "text-sm font-semibold",
+                      player.winrate >= 50
+                        ? "text-emerald-400"
+                        : "text-red-400",
+                    )}
+                  >
                     {formatWinrate(player.winrate)}
                   </span>
                   <span className="ml-1.5 text-xs text-zinc-600">

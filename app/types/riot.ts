@@ -180,6 +180,12 @@ export interface PlayerAggregatedStats {
   avgCs: number;
   avgCsPerMin: number;
   avgDamage: number;
+  avgDmgPerMin: number;
+  avgGoldPerMin: number;
+  avgDmgPerMinNoSupp: number;
+  avgCsPerMinNoSupp: number;
+  avgGoldPerMinNoSupp: number;
+  nonSuppGames: number;
   avgVisionScore: number;
   avgKillParticipation: number;
   championStats: ChampionStats[];
@@ -187,22 +193,28 @@ export interface PlayerAggregatedStats {
   primaryRole: Position | null;
 }
 
+export interface RankedEntry {
+  gameName: string;
+  value: number;
+  games: number;
+  extra?: string; // e.g. champion name for bestChampion
+  extra2?: string; // e.g. record string "3W-1L"
+}
+
+export type StatCategory =
+  | "winrate"
+  | "kda"
+  | "dmgPerMin"
+  | "csPerMin"
+  | "goldPerMin"
+  | "kills"
+  | "deaths"
+  | "assists"
+  | "killParticipation"
+  | "vision"
+  | "bestChampion";
+
 export interface BestOfChallenge {
-  topWinrate: { gameName: string; value: number; games: number } | null;
-  topKda: { gameName: string; value: number; games: number } | null;
-  topDamage: { gameName: string; value: number; games: number } | null;
-  bestChampion: {
-    gameName: string;
-    championName: string;
-    winrate: number;
-    games: number;
-  } | null;
-  mostAvgKills: { gameName: string; value: number; games: number } | null;
-  leastAvgDeaths: { gameName: string; value: number; games: number } | null;
-  mostAvgAssists: { gameName: string; value: number; games: number } | null;
-  topKillParticipation: {
-    gameName: string;
-    value: number;
-    games: number;
-  } | null;
+  best: Record<StatCategory, RankedEntry[]>;
+  worst: Record<StatCategory, RankedEntry[]>;
 }

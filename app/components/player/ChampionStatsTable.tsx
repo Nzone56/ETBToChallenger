@@ -21,6 +21,8 @@ export default function ChampionStatsTable({
 }: ChampionStatsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("games");
   const [sortAsc, setSortAsc] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const INITIAL_LIMIT = 15;
 
   if (champions.length === 0) {
     return null;
@@ -126,48 +128,66 @@ export default function ChampionStatsTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/50">
-            {sorted.map((champ) => (
-              <tr
-                key={champ.championName}
-                className="transition-colors hover:bg-zinc-800/30"
-              >
-                <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <ChampionIcon
-                      championName={champ.championName}
-                      version={version}
-                      size={28}
-                    />
-                    <span className="font-medium text-zinc-200">
-                      {champ.championName}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-4 py-2.5 text-center text-zinc-400">
-                  {champ.games}
-                </td>
-                <td className="px-4 py-2.5">
-                  <div className="mx-auto w-24">
-                    <WinrateBar
-                      wins={champ.wins}
-                      losses={champ.losses}
-                      showLabel={false}
-                    />
-                    <div className="mt-0.5 text-center text-xs text-zinc-400">
-                      {formatWinrate(champ.winrate)}
+            {(showAll ? sorted : sorted.slice(0, INITIAL_LIMIT)).map(
+              (champ) => (
+                <tr
+                  key={champ.championName}
+                  className="transition-colors hover:bg-zinc-800/30"
+                >
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <ChampionIcon
+                        championName={champ.championName}
+                        version={version}
+                        size={28}
+                      />
+                      <span className="font-medium text-zinc-200">
+                        {champ.championName}
+                      </span>
                     </div>
-                  </div>
-                </td>
-                <td className="px-4 py-2.5 text-center text-zinc-300">
-                  {formatKda(champ.avgKda)}
-                </td>
-                <td className="hidden px-4 py-2.5 text-center text-zinc-400 sm:table-cell">
-                  {Math.round(champ.avgDamage).toLocaleString()}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-4 py-2.5 text-center text-zinc-400">
+                    {champ.games}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <div className="mx-auto w-24">
+                      <WinrateBar
+                        wins={champ.wins}
+                        losses={champ.losses}
+                        showLabel={false}
+                      />
+                      <div className="mt-0.5 text-center text-xs text-zinc-400">
+                        {formatWinrate(champ.winrate)}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5 text-center text-zinc-300">
+                    {formatKda(champ.avgKda)}
+                  </td>
+                  <td className="hidden px-4 py-2.5 text-center text-zinc-400 sm:table-cell">
+                    {Math.round(champ.avgDamage).toLocaleString()}
+                  </td>
+                </tr>
+              ),
+            )}
           </tbody>
         </table>
+        {!showAll && sorted.length > INITIAL_LIMIT && (
+          <button
+            onClick={() => setShowAll(true)}
+            className="flex w-full items-center justify-center gap-1 border-t border-zinc-800 py-2.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-800/30 hover:text-zinc-300 cursor-pointer"
+          >
+            Show all {sorted.length} champions
+          </button>
+        )}
+        {showAll && sorted.length > INITIAL_LIMIT && (
+          <button
+            onClick={() => setShowAll(false)}
+            className="flex w-full items-center justify-center gap-1 border-t border-zinc-800 py-2.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-800/30 hover:text-zinc-300 cursor-pointer"
+          >
+            Show less
+          </button>
+        )}
       </div>
     </div>
   );

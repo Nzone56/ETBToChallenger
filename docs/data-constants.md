@@ -8,18 +8,18 @@ Central configuration file for LP math, tier colors, queue IDs, season config, a
 
 The ranked ladder is modeled as a continuous LP scale:
 
-| Tier | LP Width | Base LP | Divisions |
-|------|----------|---------|-----------|
-| Iron | 400 | 0 | IV, III, II, I (100 LP each) |
-| Bronze | 400 | 400 | IV, III, II, I |
-| Silver | 400 | 800 | IV, III, II, I |
-| Gold | 400 | 1200 | IV, III, II, I |
-| Platinum | 400 | 1600 | IV, III, II, I |
-| Emerald | 400 | 2000 | IV, III, II, I |
-| Diamond | 400 | 2400 | IV, III, II, I |
-| Master | 200 | 2800 | Single division |
-| Grandmaster | 300 | 3000 | Single division |
-| Challenger | 500 (display cap) | 3300 | Single division |
+| Tier        | LP Width          | Base LP | Divisions                    |
+| ----------- | ----------------- | ------- | ---------------------------- |
+| Iron        | 400               | 0       | IV, III, II, I (100 LP each) |
+| Bronze      | 400               | 400     | IV, III, II, I               |
+| Silver      | 400               | 800     | IV, III, II, I               |
+| Gold        | 400               | 1200    | IV, III, II, I               |
+| Platinum    | 400               | 1600    | IV, III, II, I               |
+| Emerald     | 400               | 2000    | IV, III, II, I               |
+| Diamond     | 400               | 2400    | IV, III, II, I               |
+| Master      | 200               | 2800    | Single division              |
+| Grandmaster | 300               | 3000    | Single division              |
+| Challenger  | 500 (display cap) | 3300    | Single division              |
 
 **Key functions:**
 
@@ -54,7 +54,7 @@ TIER_COLORS: Record<RankTier, string> = {
 ### Season Configuration
 
 ```ts
-SEASON_START_EPOCH = new Date("2026-01-08T00:00:00Z").getTime()
+SEASON_START_EPOCH = new Date("2026-01-08T00:00:00Z").getTime();
 ```
 
 All match fetching filters by this date. To change the season boundary, update this single value.
@@ -67,7 +67,6 @@ All match fetching filters by this date. To change the season boundary, update t
 ### Best-of Thresholds
 
 - `MIN_GAMES_FOR_BEST = 5` — Minimum games for a player to appear in "Best of" cards.
-- `MIN_CHAMPION_GAMES = 3` — Minimum games on a champion for "Best Champion" card.
 
 ---
 
@@ -77,14 +76,15 @@ Hardcoded list of tracked players. Each entry has:
 
 ```ts
 interface User {
-  gameName: string;   // Riot game name
-  tagLine: string;    // Riot tag (e.g. "ETB")
-  puuid: string;      // Player UUID (from Riot Account API)
-  region: string;     // Display region
+  gameName: string; // Riot game name
+  tagLine: string; // Riot tag (e.g. "ETB")
+  puuid: string; // Player UUID (from Riot Account API)
+  region: string; // Display region
 }
 ```
 
 Helper functions:
+
 - `getUserByRiotId(gameName, tagLine)` — Find a user by name + tag.
 - `getUserByPuuid(puuid)` — Find a user by PUUID.
 

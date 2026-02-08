@@ -4,6 +4,8 @@ import {
   PlayerAggregatedStats,
   ChampionStats,
   RoleStats,
+  RankedEntry,
+  StatCategory,
   BestOfChallenge,
   Position,
   LeagueEntry,
@@ -11,9 +13,9 @@ import {
 import {
   rankToLp,
   MIN_GAMES_FOR_BEST,
-  MIN_CHAMPION_GAMES,
   TIER_ORDER,
   TIER_BASE_LP,
+  SEASON_START_EPOCH,
 } from "../data/constants";
 
 // ─── Extract participant from match ───
@@ -60,7 +62,11 @@ export function aggregatePlayerStats(
   puuid: string,
   matches: Match[],
 ): PlayerAggregatedStats {
-  const validMatches = matches.filter((m) => getParticipant(m, puuid));
+  const validMatches = matches.filter(
+    (m) =>
+      getParticipant(m, puuid) &&
+      m.info.gameStartTimestamp >= SEASON_START_EPOCH,
+  );
 
   if (validMatches.length === 0) {
     return {
@@ -75,6 +81,12 @@ export function aggregatePlayerStats(
       avgCs: 0,
       avgCsPerMin: 0,
       avgDamage: 0,
+      avgDmgPerMin: 0,
+      avgGoldPerMin: 0,
+      avgDmgPerMinNoSupp: 0,
+      avgCsPerMinNoSupp: 0,
+      avgGoldPerMinNoSupp: 0,
+      nonSuppGames: 0,
       avgVisionScore: 0,
       avgKillParticipation: 0,
       championStats: [],
@@ -87,8 +99,14 @@ export function aggregatePlayerStats(
   let totalDeaths = 0;
   let totalAssists = 0;
   let totalDamage = 0;
+  let totalDmgPerMin = 0;
+  let totalGoldPerMin = 0;
   let totalCs = 0;
   let totalCsPerMin = 0;
+  let totalDmgPerMinNoSupp = 0;
+  let totalCsPerMinNoSupp = 0;
+  let totalGoldPerMinNoSupp = 0;
+  let nonSuppGames = 0;
   let totalVision = 0;
   let totalKillParticipation = 0;
   let wins = 0;
@@ -117,11 +135,25 @@ export function aggregatePlayerStats(
     totalDeaths += p.deaths;
     totalAssists += p.assists;
     totalDamage += p.totalDamageDealtToChampions;
+    const durationMin = match.info.gameDuration / 60;
+    totalDmgPerMin +=
+      durationMin > 0 ? p.totalDamageDealtToChampions / durationMin : 0;
+    totalGoldPerMin += durationMin > 0 ? p.goldEarned / durationMin : 0;
     const cs = p.totalMinionsKilled + p.neutralMinionsKilled;
     totalCs += cs;
     totalCsPerMin += calcCsPerMin(cs, match.info.gameDuration);
     totalVision += p.visionScore;
     if (p.win) wins++;
+
+    // Non-support stats (DMG/min, CS/min, Gold/min excluding support games)
+    const isSupport = p.teamPosition === "UTILITY";
+    if (!isSupport) {
+      nonSuppGames++;
+      totalDmgPerMinNoSupp +=
+        durationMin > 0 ? p.totalDamageDealtToChampions / durationMin : 0;
+      totalCsPerMinNoSupp += calcCsPerMin(cs, match.info.gameDuration);
+      totalGoldPerMinNoSupp += durationMin > 0 ? p.goldEarned / durationMin : 0;
+    }
 
     // Kill participation: (kills + assists) / team total kills
     const teamKills = match.info.participants
@@ -202,6 +234,15 @@ export function aggregatePlayerStats(
     avgCs: totalCs / total,
     avgCsPerMin: totalCsPerMin / total,
     avgDamage: totalDamage / total,
+    avgDmgPerMin: totalDmgPerMin / total,
+    avgGoldPerMin: totalGoldPerMin / total,
+    avgDmgPerMinNoSupp:
+      nonSuppGames > 0 ? totalDmgPerMinNoSupp / nonSuppGames : 0,
+    avgCsPerMinNoSupp:
+      nonSuppGames > 0 ? totalCsPerMinNoSupp / nonSuppGames : 0,
+    avgGoldPerMinNoSupp:
+      nonSuppGames > 0 ? totalGoldPerMinNoSupp / nonSuppGames : 0,
+    nonSuppGames,
     avgVisionScore: totalVision / total,
     avgKillParticipation: (totalKillParticipation / total) * 100,
     championStats,
@@ -210,86 +251,106 @@ export function aggregatePlayerStats(
   };
 }
 
-// ─── Best of Challenge (across all players) ───
+// ─── Best / Worst of Challenge (across all players, ranked lists) ───
+
 export function computeBestOfChallenge(
   players: { gameName: string; stats: PlayerAggregatedStats }[],
 ): BestOfChallenge {
-  let topWinrate: BestOfChallenge["topWinrate"] = null;
-  let topKda: BestOfChallenge["topKda"] = null;
-  let topDamage: BestOfChallenge["topDamage"] = null;
-  let bestChampion: BestOfChallenge["bestChampion"] = null;
-  let mostAvgKills: BestOfChallenge["mostAvgKills"] = null;
-  let leastAvgDeaths: BestOfChallenge["leastAvgDeaths"] = null;
-  let mostAvgAssists: BestOfChallenge["mostAvgAssists"] = null;
-  let topKillParticipation: BestOfChallenge["topKillParticipation"] = null;
+  const eligible = players.filter(
+    (p) => p.stats.totalGames >= MIN_GAMES_FOR_BEST,
+  );
 
-  for (const { gameName, stats } of players) {
-    if (stats.totalGames < MIN_GAMES_FOR_BEST) continue;
-
-    if (!topWinrate || stats.winrate > topWinrate.value) {
-      topWinrate = { gameName, value: stats.winrate, games: stats.totalGames };
-    }
-    if (!topKda || stats.avgKda > topKda.value) {
-      topKda = { gameName, value: stats.avgKda, games: stats.totalGames };
-    }
-    if (!topDamage || stats.avgDamage > topDamage.value) {
-      topDamage = { gameName, value: stats.avgDamage, games: stats.totalGames };
-    }
-    if (!mostAvgKills || stats.avgKills > mostAvgKills.value) {
-      mostAvgKills = {
-        gameName,
-        value: stats.avgKills,
-        games: stats.totalGames,
-      };
-    }
-    if (!leastAvgDeaths || stats.avgDeaths < leastAvgDeaths.value) {
-      leastAvgDeaths = {
-        gameName,
-        value: stats.avgDeaths,
-        games: stats.totalGames,
-      };
-    }
-    if (!mostAvgAssists || stats.avgAssists > mostAvgAssists.value) {
-      mostAvgAssists = {
-        gameName,
-        value: stats.avgAssists,
-        games: stats.totalGames,
-      };
-    }
-    if (
-      !topKillParticipation ||
-      stats.avgKillParticipation > topKillParticipation.value
-    ) {
-      topKillParticipation = {
-        gameName,
-        value: stats.avgKillParticipation,
-        games: stats.totalGames,
-      };
-    }
-
-    for (const champ of stats.championStats) {
-      if (champ.games < MIN_CHAMPION_GAMES) continue;
-      if (!bestChampion || champ.winrate > bestChampion.winrate) {
-        bestChampion = {
-          gameName,
-          championName: champ.championName,
-          winrate: champ.winrate,
-          games: champ.games,
-        };
-      }
-    }
+  // Helper: build sorted entries for a stat extractor
+  function rank(
+    extract: (s: PlayerAggregatedStats, gn: string) => RankedEntry[],
+    desc: boolean,
+  ): RankedEntry[] {
+    const entries = eligible.flatMap(({ gameName, stats }) =>
+      extract(stats, gameName),
+    );
+    entries.sort((a, b) => {
+      const diff = desc ? b.value - a.value : a.value - b.value;
+      if (diff !== 0) return diff;
+      return b.games - a.games; // tie-break: more games = higher rank
+    });
+    return entries.slice(0, 3);
   }
 
-  return {
-    topWinrate,
-    topKda,
-    topDamage,
-    bestChampion,
-    mostAvgKills,
-    leastAvgDeaths,
-    mostAvgAssists,
-    topKillParticipation,
+  // Simple stat: uses totalGames as game count
+  const simple = (
+    field: keyof PlayerAggregatedStats,
+    desc: boolean,
+  ): RankedEntry[] =>
+    rank(
+      (s, gn) => [
+        { gameName: gn, value: s[field] as number, games: s.totalGames },
+      ],
+      desc,
+    );
+
+  // No-supp stat: uses nonSuppGames as game count
+  const noSupp = (
+    field: keyof PlayerAggregatedStats,
+    desc: boolean,
+  ): RankedEntry[] =>
+    rank(
+      (s, gn) => [
+        { gameName: gn, value: s[field] as number, games: s.nonSuppGames },
+      ],
+      desc,
+    );
+
+  // Best/worst champion: ranked by absolute points (wins - losses)
+  function champRank(desc: boolean): RankedEntry[] {
+    const entries: RankedEntry[] = [];
+    for (const { gameName, stats } of eligible) {
+      for (const c of stats.championStats) {
+        entries.push({
+          gameName,
+          value: c.wins - c.losses,
+          games: c.games,
+          extra: c.championName,
+          extra2: `${c.wins}W-${c.losses}L`,
+        });
+      }
+    }
+    entries.sort((a, b) => {
+      const diff = desc ? b.value - a.value : a.value - b.value;
+      if (diff !== 0) return diff;
+      return b.games - a.games;
+    });
+    return entries.slice(0, 3);
+  }
+
+  const best: Record<StatCategory, RankedEntry[]> = {
+    winrate: simple("winrate", true),
+    kda: simple("avgKda", true),
+    dmgPerMin: noSupp("avgDmgPerMinNoSupp", true),
+    csPerMin: noSupp("avgCsPerMinNoSupp", true),
+    goldPerMin: noSupp("avgGoldPerMinNoSupp", true),
+    kills: simple("avgKills", true),
+    deaths: simple("avgDeaths", false), // best = least deaths
+    assists: simple("avgAssists", true),
+    killParticipation: simple("avgKillParticipation", true),
+    vision: simple("avgVisionScore", true),
+    bestChampion: champRank(true),
   };
+
+  const worst: Record<StatCategory, RankedEntry[]> = {
+    winrate: simple("winrate", false),
+    kda: simple("avgKda", false),
+    dmgPerMin: noSupp("avgDmgPerMinNoSupp", false),
+    csPerMin: noSupp("avgCsPerMinNoSupp", false),
+    goldPerMin: noSupp("avgGoldPerMinNoSupp", false),
+    kills: simple("avgKills", false),
+    deaths: simple("avgDeaths", true), // worst = most deaths
+    assists: simple("avgAssists", false),
+    killParticipation: simple("avgKillParticipation", false),
+    vision: simple("avgVisionScore", false),
+    bestChampion: champRank(false),
+  };
+
+  return { best, worst };
 }
 
 // ─── Average team Elo ───

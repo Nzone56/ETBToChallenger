@@ -126,8 +126,8 @@ export const POSITION_LABELS: Record<Position, string> = {
 export const QUEUE_FLEX = 440;
 export const QUEUE_SOLO = 420;
 
-// ─── Season Start (Jan 8, 2026 00:00 UTC) ───
-export const SEASON_START_EPOCH = new Date("2026-01-08T00:00:00Z").getTime();
+// ─── Season Start (Jan 8, 2026 — buffered to noon Jan 7 UTC to avoid TZ edge cases) ───
+export const SEASON_START_EPOCH = new Date("2026-01-08T12:00:00Z").getTime();
 
 // ─── DDragon ───
 export const DDRAGON_VERSION_URL =
@@ -172,4 +172,3 @@ export const AVG_LP_PER_WIN = 20; // Estimated average LP gained per win
 
 // ─── Min Games for "Best Of" ───
 export const MIN_GAMES_FOR_BEST = 5;
-export const MIN_CHAMPION_GAMES = 3;

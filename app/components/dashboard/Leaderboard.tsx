@@ -81,7 +81,16 @@ export default function Leaderboard({ players, version }: LeaderboardProps) {
 
               {/* Winrate */}
               <div className="text-right">
-                <div className="text-sm font-medium text-zinc-300">
+                <div
+                  className={cn(
+                    "text-sm font-medium",
+                    winrate === "—"
+                      ? "text-zinc-300"
+                      : parseFloat(winrate) >= 50
+                        ? "text-emerald-400"
+                        : "text-red-400",
+                  )}
+                >
                   {winrate}%
                 </div>
                 <div className="text-xs text-zinc-600">{total}G</div>
