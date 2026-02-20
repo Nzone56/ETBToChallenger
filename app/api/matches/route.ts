@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   );
 
   try {
-    const all = getMatchesByPuuid(puuid) as Match[];
+    const all = (await getMatchesByPuuid(puuid)) as Match[];
     const matches = all.slice(start, start + count);
     console.log(
       `[DB  ✓] /api/matches  returned ${matches.length}/${all.length} matches`,

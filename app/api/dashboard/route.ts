@@ -15,12 +15,18 @@ import type {
 
 // GET /api/dashboard — full dashboard data from DB (0 Riot API calls)
 export async function GET() {
-  const snapshots = getAllRankedSnapshots();
-  const statsRows = getAllPlayerStats();
+  const [snapshots, statsRows, allMatchArrays] = await Promise.all([
+    getAllRankedSnapshots(),
+    getAllPlayerStats(),
+    Promise.all(users.map((u) => getMatchesByPuuid(u.puuid))),
+  ]);
 
   // Build a map for quick lookup
   const snapshotMap = new Map(snapshots.map((s) => [s.puuid, s]));
   const statsMap = new Map(statsRows.map((r) => [r.puuid, r]));
+  const matchMap = new Map(
+    users.map((u, i) => [u.puuid, allMatchArrays[i] as Match[]]),
+  );
 
   // Check if DB is empty (never synced)
   if (snapshots.length === 0) {
@@ -46,7 +52,7 @@ export async function GET() {
       : null;
 
     // Last match: most recent from DB
-    const matches = getMatchesByPuuid(user.puuid) as Match[];
+    const matches = matchMap.get(user.puuid) ?? [];
     const lastMatch = matches.length > 0 ? matches[0] : null;
 
     return {

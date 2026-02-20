@@ -2,7 +2,7 @@ import { getDdragonVersion } from "@/app/lib/service";
 import {
   getRankedSnapshot,
   getPlayerStats,
-  getMatchesByPuuid,
+  getMatchesByPuuidPaged,
 } from "@/app/lib/db";
 import { getUserByRiotId } from "@/app/data/users";
 import { notFound } from "next/navigation";
@@ -20,7 +20,7 @@ import type {
   Match,
 } from "@/app/types/riot";
 
-export const revalidate = 120;
+export const revalidate = 900;
 
 interface PlayerPageProps {
   params: Promise<{ gameName: string }>;
@@ -33,9 +33,10 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
   const user = getUserByRiotId(decodedGameName, "ETB");
   if (!user) notFound();
 
-  const [snap, statsRow, version] = await Promise.all([
-    Promise.resolve(getRankedSnapshot(user.puuid)),
-    Promise.resolve(getPlayerStats(user.puuid)),
+  const [snap, statsRow, matches, version] = await Promise.all([
+    getRankedSnapshot(user.puuid),
+    getPlayerStats(user.puuid),
+    getMatchesByPuuidPaged(user.puuid, 10),
     getDdragonVersion(),
   ]);
 
@@ -48,7 +49,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     ? JSON.parse(snap.flexEntryJson)
     : null;
   const stats = statsRow as PlayerAggregatedStats | null;
-  const matches = getMatchesByPuuid(user.puuid) as Match[];
+  const typedMatches = matches as unknown as Match[];
 
   const ranked: PlayerRankedData = {
     puuid: user.puuid,
@@ -83,7 +84,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
             />
             <MatchHistoryList
               puuid={user.puuid}
-              initialMatches={matches.slice(0, 10)}
+              initialMatches={typedMatches}
               version={version}
               pageSize={10}
             />

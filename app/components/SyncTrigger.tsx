@@ -7,22 +7,23 @@ interface SyncTriggerProps {
   syncedAt?: number | null; // unix ms of last sync (from DB)
 }
 
-// Re-sync only if data is older than 10 minutes
-const SYNC_INTERVAL_MS = 10 * 60 * 1000;
+// Re-sync only if data is older than 15 minutes (matches page cache duration)
+const SYNC_INTERVAL_MS = 15 * 60 * 1000;
 // Session key — ensures only ONE sync fires per browser tab session
 const SESSION_KEY = "etb_sync_fired";
 
 // Fires a background POST /api/sync at most once per browser session,
-// and only when data is stale (>10min) or the DB is empty.
+// and only when data is stale (>15min) or the DB is empty.
 // The server-side lock also blocks concurrent syncs from multiple tabs.
 export default function SyncTrigger({ dbEmpty, syncedAt }: SyncTriggerProps) {
   useEffect(() => {
-    // Already fired in this browser session — skip
-    if (sessionStorage.getItem(SESSION_KEY)) return;
-
     const isStale =
       dbEmpty || !syncedAt || Date.now() - syncedAt > SYNC_INTERVAL_MS;
     if (!isStale) return;
+
+    // Only use sessionStorage to deduplicate when data is NOT empty
+    // (if DB is empty we must always attempt a sync)
+    if (!dbEmpty && sessionStorage.getItem(SESSION_KEY)) return;
 
     sessionStorage.setItem(SESSION_KEY, "1");
     console.log(

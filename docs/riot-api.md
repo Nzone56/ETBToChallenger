@@ -1,8 +1,12 @@
 # Riot API Integration
 
+## Overview
+
+**Pages never call the Riot API directly.** All match and player data is stored in Turso DB and accessed via cached database queries. The Riot API is only called during background sync jobs triggered via `POST /api/sync`.
+
 ## Authentication
 
-All Riot API requests are authenticated via the `X-Riot-Token` header. The API key is read from the `RIOT_API_KEY` environment variable in `.env`.
+All Riot API requests (from the sync job) are authenticated via the `X-Riot-Token` header. The API key is read from the `RIOT_API_KEY` environment variable in `.env`.
 
 ```env
 RIOT_API_KEY=RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
@@ -55,69 +59,42 @@ Page 2: start=100, count=100, startTime=SEASON_START
 
 `client.ts` tracks every API request with category labels (`RANKED`, `MATCH_IDS`, `MATCH_DETAIL`) and logs a summary via `logApiSummary()`. This is called after dashboard data fetching to monitor API usage in the server console.
 
-## Caching Strategy
+## Background Sync Strategy
 
-Next.js `fetch` with `next: { revalidate }` is used for all Riot API calls. Each data type has a different cache duration based on how often it changes:
+The sync job (`app/lib/sync.ts`) is triggered via `POST /api/sync` and:
 
-| Data Type           | Cache Duration    | Rationale                                                              |
-| ------------------- | ----------------- | ---------------------------------------------------------------------- |
-| **DDragon version** | 1 hour (3600s)    | Game patches are infrequent                                            |
-| **Summoner data**   | 1 hour (3600s)    | Profile icons rarely change                                            |
-| **Ranked entries**  | 2 minutes (120s)  | LP/rank changes after every game                                       |
-| **Match IDs**       | 5 minutes (300s)  | New matches appear frequently                                          |
-| **Match details**   | 24 hours (86400s) | Match data is **immutable** — once a game ends, its data never changes |
+1. Fetches ranked snapshots for all players (summoner data + flex rank)
+2. Fetches new match IDs from Riot API (with `startTime` filter for current season)
+3. Fetches full match details for any new matches not already in the DB
+4. Stores everything in Turso DB
+5. Calls `revalidateTag("db", "default")` to bust the Next.js cache
 
-These values are set in `app/lib/client.ts`:
+**Auto-sync trigger:** `SyncTrigger` component fires a POST `/api/sync` when:
 
-```ts
-riotFetch(url, 300); // Default: 5 min
-riotFetchRanked(url); // 2 min — ranked data changes often
-riotFetchMatch(url); // 24 hours — matches are immutable
-```
+- The database is empty, OR
+- The last sync was >15 minutes ago
 
-**Page-level revalidation**: All pages export `revalidate = 120` (2 minutes). This means Next.js will serve a cached page for up to 2 minutes before regenerating it on the next request.
+**Manual sync:** Visit any page and it will auto-trigger if stale, or call `POST /api/sync` directly.
 
-### How Caching Prevents Excessive Requests
+## Database Cache (Not Riot API Cache)
 
-When a user visits the dashboard:
+All database queries use **Next.js `unstable_cache`** with:
 
-1. **First visit**: All API calls are made fresh. This can be 200+ requests (7 players × ~25 matches each).
-2. **Within 2 minutes**: The entire page is served from cache — **zero API requests**.
-3. **After 2 minutes**: Next.js regenerates the page in the background (ISR). Ranked data is re-fetched (2-min cache expired), but match details are still cached (24-hour cache), so only ~20 new requests are made instead of 200+.
+- **15-minute revalidation** (`revalidate: 900`)
+- **Cache tag** `"db"` — invalidated after every sync
 
-### Important: Match Details Are the Biggest Cost
-
-Each match detail is a separate API call. With 7 players × 25 matches = 175 match detail requests on a cold start. However, since match data never changes, the 24-hour cache means these are only fetched once per day per match.
-
-**If you see 429 (rate limited) errors**, it's likely because:
-
-- The cache was cleared (e.g., redeployment)
-- A new season started and all matches are new
-- The dev server was restarted (in-memory cache lost)
+This means Turso DB queries are cached for 15 minutes, not Riot API calls. Riot API is only called during sync, and those calls are **not cached** — the sync always fetches fresh data from Riot and writes it to the database.
 
 ## Rate Limits
 
-Riot API keys have strict rate limits:
+Riot API keys have strict rate limits. The sync job is designed to stay within these limits:
 
 | Key Type        | Per Second    | Per 2 Minutes    |
 | --------------- | ------------- | ---------------- |
 | **Development** | 20 requests   | 100 requests     |
 | **Production**  | 500+ requests | 30,000+ requests |
 
-### Request Breakdown Per Route
-
-| Route            | Requests (Cold)                                                                    | Requests (Warm)               |
-| ---------------- | ---------------------------------------------------------------------------------- | ----------------------------- |
-| `/` (Dashboard)  | ~200 (7 ranked + 7 match IDs + 7 last matches + 7 summoners + ~175 season matches) | ~14 (ranked + summoners only) |
-| `/team`          | ~190 (7 summoners + ~175 season matches + 7 match ID pages)                        | ~7 (summoners only)           |
-| `/player/[name]` | ~30 (1 ranked + 1 summoner + ~25 match details)                                    | ~2 (ranked + summoner)        |
-
-### Avoiding Rate Limit Issues
-
-1. **Use a production API key** for any deployment — dev keys are too restrictive for 7+ players.
-2. **Don't restart the dev server frequently** — each restart clears the fetch cache.
-3. **Match details are the safest to cache aggressively** — they never change. Consider adding Redis or a database cache for match data in production.
-4. **The `logApiSummary()` function** prints request counts to the server console after each dashboard load. Monitor this to understand your API usage.
+Use a **production API key** for deployments with 7+ players — dev keys will hit rate limits on the first sync.
 
 ## Changing API Regions
 

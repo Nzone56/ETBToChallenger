@@ -6,13 +6,15 @@ import {
   getLinkedMatchIds,
   getGlobalStoredMatchIds,
   storeMatches,
+  storePlayerMatchLinks,
   upsertRankedSnapshot,
   upsertPlayerStats,
   upsertSyncLog,
+  storeGroupMatches,
   getMatchesByPuuid,
   getDb,
 } from "./db";
-import { aggregatePlayerStats } from "./helpers";
+import { aggregatePlayerStats, findGroupMatches } from "./helpers";
 import type { LeagueEntry, Match, Summoner } from "../types/riot";
 
 const SEASON_START_SECONDS = Math.floor(SEASON_START_EPOCH / 1000);
@@ -131,7 +133,7 @@ export async function syncPlayer(
 
   const flexEntry =
     entries.find((e) => e.queueType === "RANKED_FLEX_SR") ?? null;
-  upsertRankedSnapshot({
+  await upsertRankedSnapshot({
     puuid,
     gameName: user.gameName,
     tagLine: user.tagLine,
@@ -144,15 +146,17 @@ export async function syncPlayer(
   // 2. Get all season match IDs from Riot for this player
   const riotIds = await fetchAllMatchIds(puuid, user.gameName);
 
-  // 3. Diff against DB
-  const linkedIds = getLinkedMatchIds(puuid); // already in player_matches for this player
-  const globalIds = getGlobalStoredMatchIds(); // blobs in matches table (any player)
+  // 3. Diff against DB (both async now)
+  const [linkedIds, globalIds] = await Promise.all([
+    getLinkedMatchIds(puuid),
+    getGlobalStoredMatchIds(),
+  ]);
 
   const toFetch = riotIds.filter((id) => !globalIds.has(id)); // need Riot API call
   const toLink = riotIds.filter(
     (id) => globalIds.has(id) && !linkedIds.has(id),
   ); // blob exists, just link
-  const alreadyDone = riotIds.filter((id) => linkedIds.has(id)).length; // already linked this season
+  const alreadyDone = riotIds.filter((id) => linkedIds.has(id)).length;
 
   console.log(
     `[SYNC] ${user.gameName}: ${riotIds.length} season IDs | ` +
@@ -175,7 +179,7 @@ export async function syncPlayer(
 
   // 5. Store new blobs in matches table
   if (newMatches.length > 0) {
-    storeMatches(
+    await storeMatches(
       newMatches.map((m) => ({
         matchId: m.metadata.matchId,
         data: m,
@@ -186,42 +190,50 @@ export async function syncPlayer(
   }
 
   // 6. Link all IDs (newly fetched + cached from other players) to this player
-  const db = getDb();
-  const tx = db.transaction(() => {
-    const linkStmt = db.prepare(
-      "INSERT OR IGNORE INTO player_matches (puuid, match_id, played_at) VALUES (?, ?, ?)",
-    );
-    const getBlob = db.prepare("SELECT data FROM matches WHERE match_id = ?");
+  // For toLink we need the playedAt — fetch it from the already-stored blobs
+  // by re-querying globalIds matches. We stored them above so they're available.
+  const newLinks = newMatches.map((m) => ({
+    puuid,
+    matchId: m.metadata.matchId,
+    playedAt: m.info.gameStartTimestamp,
+  }));
 
-    // Link newly fetched matches
-    for (const m of newMatches) {
-      linkStmt.run(puuid, m.metadata.matchId, m.info.gameStartTimestamp);
-    }
-    // Link matches already in DB from other players' syncs
+  // For cache hits we need playedAt — re-fetch from DB in one batch
+  const cacheLinks: { puuid: string; matchId: string; playedAt: number }[] = [];
+  if (toLink.length > 0) {
+    const db = getDb();
+    // Fetch playedAt for each cached match from player_matches of any other player
     for (const id of toLink) {
-      const row = getBlob.get(id) as { data: string } | undefined;
-      if (row) {
-        const m = JSON.parse(row.data) as Match;
-        linkStmt.run(puuid, id, m.info.gameStartTimestamp);
-      }
+      const res = await db.execute({
+        sql: "SELECT played_at FROM player_matches WHERE match_id = ? LIMIT 1",
+        args: [id],
+      });
+      const row = res.rows[0];
+      if (row)
+        cacheLinks.push({
+          puuid,
+          matchId: id,
+          playedAt: row.played_at as number,
+        });
     }
-  });
-  tx();
+  }
+
+  await storePlayerMatchLinks([...newLinks, ...cacheLinks]);
   console.log(
-    `[DB  ✓] Linked ${newMatches.length + toLink.length} matches to ${user.gameName} ` +
-      `(${newMatches.length} new + ${toLink.length} from cache)`,
+    `[DB  ✓] Linked ${newLinks.length + cacheLinks.length} matches to ${user.gameName} ` +
+      `(${newLinks.length} new + ${cacheLinks.length} from cache)`,
   );
 
   // 7. Recompute aggregated stats
-  const allMatches = getMatchesByPuuid(puuid) as Match[];
+  const allMatches = (await getMatchesByPuuid(puuid)) as Match[];
   const stats = aggregatePlayerStats(puuid, allMatches);
-  upsertPlayerStats(puuid, user.gameName, stats);
+  await upsertPlayerStats(puuid, user.gameName, stats);
   console.log(
     `[DB  ✓] Recomputed stats for ${user.gameName} (${allMatches.length} matches)`,
   );
 
   // 8. Update sync log
-  upsertSyncLog(puuid, riotIds.length);
+  await upsertSyncLog(puuid, riotIds.length);
 
   console.log(
     `[SYNC] Done: ${user.gameName} — fetched ${toFetch.length} from Riot, linked ${toLink.length} from cache`,
@@ -255,6 +267,30 @@ export async function syncAllPlayers(): Promise<{
   }
 
   const riotCallsEstimate = users.length * 3 + totalNew;
+
+  // Precompute group matches (2+ members played together) and store in DB
+  // so the /team page never needs to load all matches at request time
+  try {
+    const allPlayerMatches = await Promise.all(
+      users.map(async (u) => ({
+        puuid: u.puuid,
+        gameName: u.gameName,
+        matches: (await getMatchesByPuuid(u.puuid)) as Match[],
+      })),
+    );
+    const grouped = findGroupMatches(allPlayerMatches);
+    await storeGroupMatches(
+      grouped.map(({ match, players }) => ({
+        matchId: match.metadata.matchId,
+        matchData: match,
+        playerList: players,
+        playedAt: match.info.gameStartTimestamp,
+      })),
+    );
+    console.log(`[DB  ✓] Stored ${grouped.length} group matches`);
+  } catch (err) {
+    console.error("[SYNC] Failed to precompute group matches:", err);
+  }
 
   console.log(`\n${"═".repeat(60)}`);
   console.log(`[SYNC] Complete — ${totalNew} new matches fetched from Riot`);

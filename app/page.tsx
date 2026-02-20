@@ -2,7 +2,7 @@ import { getDdragonVersion } from "./lib/service";
 import {
   getAllRankedSnapshots,
   getAllPlayerStats,
-  getMatchesByPuuid,
+  getLastMatchByPuuid,
   getLatestSyncedAt,
 } from "./lib/db";
 import {
@@ -27,19 +27,24 @@ import BestOfSection from "./components/dashboard/BestOfSection";
 import RoleLeaderboard from "./components/dashboard/RoleLeaderboard";
 import SyncTrigger from "./components/SyncTrigger";
 
-// Revalidate every 2 minutes — but pages read from DB, not Riot
-export const revalidate = 120;
+// Revalidate every 15 minutes — unstable_cache prevents redundant DB reads
+export const revalidate = 900;
 
 export default async function Home() {
-  const [snapshots, statsRows, version] = await Promise.all([
-    Promise.resolve(getAllRankedSnapshots()),
-    Promise.resolve(getAllPlayerStats()),
-    getDdragonVersion(),
-  ]);
-  const syncedAt = getLatestSyncedAt();
+  const [snapshots, statsRows, lastMatches, version, syncedAt] =
+    await Promise.all([
+      getAllRankedSnapshots(),
+      getAllPlayerStats(),
+      Promise.all(users.map((u) => getLastMatchByPuuid(u.puuid))),
+      getDdragonVersion(),
+      getLatestSyncedAt(),
+    ]);
 
   const snapshotMap = new Map(snapshots.map((s) => [s.puuid, s]));
   const statsMap = new Map(statsRows.map((r) => [r.puuid, r]));
+  const lastMatchMap = new Map(
+    users.map((u, i) => [u.puuid, lastMatches[i] as Match | null]),
+  );
   const dbEmpty = snapshots.length === 0;
 
   // Build dashboard data from DB (0 Riot calls)
@@ -51,14 +56,13 @@ export default async function Home() {
     const flexEntry: LeagueEntry | null = snap?.flexEntryJson
       ? JSON.parse(snap.flexEntryJson)
       : null;
-    const matches = getMatchesByPuuid(user.puuid) as Match[];
     return {
       puuid: user.puuid,
       gameName: user.gameName,
       tagLine: user.tagLine,
       summoner,
       flexEntry,
-      lastMatch: matches[0] ?? null,
+      lastMatch: lastMatchMap.get(user.puuid) ?? null,
     };
   });
 

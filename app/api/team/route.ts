@@ -10,8 +10,11 @@ import type { PlayerAggregatedStats, Summoner, Match } from "@/app/types/riot";
 
 // GET /api/team — team analytics data from DB (0 Riot API calls)
 export async function GET() {
-  const snapshots = getAllRankedSnapshots();
-  const statsRows = getAllPlayerStats();
+  const [snapshots, statsRows, allMatchArrays] = await Promise.all([
+    getAllRankedSnapshots(),
+    getAllPlayerStats(),
+    Promise.all(users.map((u) => getMatchesByPuuid(u.puuid))),
+  ]);
 
   if (snapshots.length === 0) {
     return NextResponse.json(
@@ -22,6 +25,9 @@ export async function GET() {
 
   const snapshotMap = new Map(snapshots.map((s) => [s.puuid, s]));
   const statsMap = new Map(statsRows.map((r) => [r.puuid, r]));
+  const matchMap = new Map(
+    users.map((u, i) => [u.puuid, allMatchArrays[i] as Match[]]),
+  );
 
   // Build per-player match + stats data
   const allPlayerMatches = users.map((user) => {
@@ -33,7 +39,7 @@ export async function GET() {
     const stats: PlayerAggregatedStats | null = statsRow?.statsJson
       ? JSON.parse(statsRow.statsJson)
       : null;
-    const matches = getMatchesByPuuid(user.puuid) as Match[];
+    const matches = matchMap.get(user.puuid) ?? [];
 
     return {
       puuid: user.puuid,

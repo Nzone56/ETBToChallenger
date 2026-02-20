@@ -3,48 +3,31 @@ import { getDdragonVersion } from "@/app/lib/service";
 import {
   getAllRankedSnapshots,
   getAllPlayerStats,
-  getMatchesByPuuid,
+  getGroupMatches,
   getLatestSyncedAt,
 } from "@/app/lib/db";
-import {
-  findGroupMatches,
-  getParticipant,
-  EMPTY_STATS,
-} from "@/app/lib/helpers";
+import { getParticipant, EMPTY_STATS } from "@/app/lib/helpers";
 import type { Summoner, PlayerAggregatedStats, Match } from "@/app/types/riot";
 import TeamOverview from "@/app/components/team/TeamOverview";
 import InternalRankings from "@/app/components/team/InternalRankings";
 import GroupMatchHistory from "@/app/components/team/GroupMatchHistory";
 import SyncTrigger from "@/app/components/SyncTrigger";
 
-export const revalidate = 120;
+export const revalidate = 900;
 
 export default async function TeamPage() {
-  const [snapshots, statsRows, version] = await Promise.all([
-    Promise.resolve(getAllRankedSnapshots()),
-    Promise.resolve(getAllPlayerStats()),
-    getDdragonVersion(),
-  ]);
-  const syncedAt = getLatestSyncedAt();
+  const [snapshots, statsRows, groupMatches, version, syncedAt] =
+    await Promise.all([
+      getAllRankedSnapshots(),
+      getAllPlayerStats(),
+      getGroupMatches(),
+      getDdragonVersion(),
+      getLatestSyncedAt(),
+    ]);
 
   const snapshotMap = new Map(snapshots.map((s) => [s.puuid, s]));
   const statsMap = new Map(statsRows.map((r) => [r.puuid, r]));
   const dbEmpty = snapshots.length === 0;
-
-  // Build per-player data from DB (0 Riot calls)
-  const allPlayerMatches = users.map((user) => {
-    const snap = snapshotMap.get(user.puuid);
-    const summoner: Summoner | null = snap?.summonerJson
-      ? JSON.parse(snap.summonerJson)
-      : null;
-    const matches = getMatchesByPuuid(user.puuid) as Match[];
-    return {
-      puuid: user.puuid,
-      gameName: user.gameName,
-      matches,
-      profileIconId: summoner?.profileIconId ?? null,
-    };
-  });
 
   const playerStatsData = users.map((user) => {
     const snap = snapshotMap.get(user.puuid);
@@ -62,11 +45,12 @@ export default async function TeamPage() {
     };
   });
 
-  // Find group matches (2+ members played together)
-  const groupMatches = findGroupMatches(allPlayerMatches);
-
-  // Calculate group wins
-  const groupWins = groupMatches.filter(({ match, players }) => {
+  // Calculate group wins from precomputed group matches
+  const typedGroupMatches = groupMatches as unknown as {
+    match: Match;
+    players: { puuid: string; gameName: string }[];
+  }[];
+  const groupWins = typedGroupMatches.filter(({ match, players }) => {
     const firstPlayer = players[0];
     const p = getParticipant(match, firstPlayer.puuid);
     return p?.win;
@@ -98,7 +82,7 @@ export default async function TeamPage() {
         <InternalRankings players={playerStatsData} version={version} />
 
         {/* Group Match History */}
-        <GroupMatchHistory groupMatches={groupMatches} />
+        <GroupMatchHistory groupMatches={typedGroupMatches} />
       </div>
     </main>
   );
