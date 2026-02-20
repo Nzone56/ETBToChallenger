@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPlayerMatches } from "@/app/lib/service";
-import { QUEUE_FLEX, SEASON_START_EPOCH } from "@/app/data/constants";
+import { getMatchesByPuuid } from "@/app/lib/db";
+import type { Match } from "@/app/types/riot";
 
-// Season start as epoch seconds (Riot API uses seconds)
-const SEASON_START_SECONDS = Math.floor(SEASON_START_EPOCH / 1000);
-
+// GET /api/matches?puuid=X&start=0&count=10
+// Serves paginated match history from SQLite — zero Riot API calls.
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const puuid = searchParams.get("puuid");
@@ -15,17 +14,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "puuid is required" }, { status: 400 });
   }
 
+  console.log(
+    `[DB  →] /api/matches  puuid=${puuid.slice(0, 12)}… start=${start} count=${count}`,
+  );
+
   try {
-    const matches = await getPlayerMatches(
-      puuid,
-      QUEUE_FLEX,
-      count,
-      start,
-      SEASON_START_SECONDS,
+    const all = (await getMatchesByPuuid(puuid)) as Match[];
+    const matches = all.slice(start, start + count);
+    console.log(
+      `[DB  ✓] /api/matches  returned ${matches.length}/${all.length} matches`,
     );
     return NextResponse.json({ matches });
   } catch (error) {
-    console.error("Error fetching matches:", error);
+    console.error("[DB  ✗] /api/matches error:", error);
     return NextResponse.json(
       { error: "Failed to fetch matches" },
       { status: 500 },

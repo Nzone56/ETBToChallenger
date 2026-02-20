@@ -57,6 +57,32 @@ export function calcCsPerMin(cs: number, gameDurationSeconds: number): number {
   return cs / minutes;
 }
 
+// ─── Empty stats sentinel (used when DB has no data yet) ───
+export const EMPTY_STATS: PlayerAggregatedStats = {
+  totalGames: 0,
+  wins: 0,
+  losses: 0,
+  winrate: 0,
+  avgKills: 0,
+  avgDeaths: 0,
+  avgAssists: 0,
+  avgKda: 0,
+  avgCs: 0,
+  avgCsPerMin: 0,
+  avgDamage: 0,
+  avgDmgPerMin: 0,
+  avgGoldPerMin: 0,
+  avgDmgPerMinNoSupp: 0,
+  avgCsPerMinNoSupp: 0,
+  avgGoldPerMinNoSupp: 0,
+  nonSuppGames: 0,
+  avgVisionScore: 0,
+  avgKillParticipation: 0,
+  championStats: [],
+  roleStats: [],
+  primaryRole: null,
+};
+
 // ─── Aggregate player stats from matches ───
 export function aggregatePlayerStats(
   puuid: string,
