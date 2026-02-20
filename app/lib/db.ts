@@ -485,6 +485,20 @@ export async function storeGroupMatches(
 // Slim payload after first sync (~50KB), but may be large with old full-blob rows.
 // React cache() deduplicates within a single request.
 // Cross-request caching handled by ISR (revalidate=900) on /team page.
+const _getGroupMatchCount = unstable_cache(
+  async (): Promise<number> => {
+    await ensureSchema();
+    const db = getDb();
+    const res = await db.execute("SELECT COUNT(*) as c FROM group_matches");
+    return (res.rows[0]?.c as number) ?? 0;
+  },
+  ["group-match-count"],
+  { tags: [DB_TAG], revalidate: 900 },
+);
+export async function getGroupMatchCount(): Promise<number> {
+  return _getGroupMatchCount();
+}
+
 export const getGroupMatches = cache(
   async (): Promise<
     { match: SlimGroupMatch; players: { puuid: string; gameName: string }[] }[]

@@ -3,8 +3,9 @@ import { getDdragonVersion } from "@/app/lib/service";
 import {
   getAllRankedSnapshots,
   getAllPlayerStats,
-  getGroupMatches,
+  getGroupMatchCount,
   getLatestSyncedAt,
+  type RankedSnapshot,
 } from "@/app/lib/db";
 import { EMPTY_STATS } from "@/app/lib/helpers";
 import type { Summoner, PlayerAggregatedStats } from "@/app/types/riot";
@@ -17,17 +18,23 @@ import SyncTrigger from "@/app/components/SyncTrigger";
 export const revalidate = 900;
 
 export default async function TeamPage() {
-  const [snapshots, statsRows, groupMatches, version, syncedAt] =
+  const [snapshots, statsRows, groupMatchCount, version, syncedAt] =
     await Promise.all([
       getAllRankedSnapshots(),
       getAllPlayerStats(),
-      getGroupMatches(),
+      getGroupMatchCount(),
       getDdragonVersion(),
       getLatestSyncedAt(),
     ]);
 
-  const snapshotMap = new Map(snapshots.map((s) => [s.puuid, s]));
-  const statsMap = new Map(statsRows.map((r) => [r.puuid, r]));
+  const snapshotMap = new Map(
+    (snapshots as RankedSnapshot[]).map((s) => [s.puuid, s]),
+  );
+  const statsMap = new Map(
+    (statsRows as { puuid: string; gameName: string; statsJson: string }[]).map(
+      (r) => [r.puuid, r],
+    ),
+  );
   const dbEmpty = snapshots.length === 0;
 
   const playerStatsData = users.map((user) => {
@@ -46,14 +53,7 @@ export default async function TeamPage() {
     };
   });
 
-  // Calculate group wins from precomputed slim group matches
-  const groupWins = groupMatches.filter(({ match, players }) => {
-    const firstPlayer = players[0];
-    const p = match.info.participants.find(
-      (pt) => pt.puuid === firstPlayer.puuid,
-    );
-    return p?.win;
-  }).length;
+  const groupWins = 0; // computed client-side in GroupMatchHistory
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -72,7 +72,7 @@ export default async function TeamPage() {
         {/* Team Overview Stats */}
         <TeamOverview
           players={playerStatsData}
-          totalGroupMatches={groupMatches.length}
+          totalGroupMatches={groupMatchCount}
           groupWins={groupWins}
           version={version}
         />
@@ -83,8 +83,8 @@ export default async function TeamPage() {
         {/* Internal Rankings (client component for sorting) */}
         <InternalRankings players={playerStatsData} version={version} />
 
-        {/* Group Match History */}
-        <GroupMatchHistory groupMatches={groupMatches} />
+        {/* Group Match History — fetches its own data client-side */}
+        <GroupMatchHistory />
       </div>
     </main>
   );

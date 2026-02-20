@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { type SlimGroupMatch } from "@/app/lib/db";
 import { calcKda, formatKda } from "@/app/lib/helpers";
 import { cn } from "@/app/lib/utils";
@@ -8,17 +8,39 @@ import { Users, ChevronDown } from "lucide-react";
 
 const PAGE_SIZE = 10;
 
-interface GroupMatchHistoryProps {
-  groupMatches: {
-    match: SlimGroupMatch;
-    players: { puuid: string; gameName: string }[];
-  }[];
-}
+type GroupMatchEntry = {
+  match: SlimGroupMatch;
+  players: { puuid: string; gameName: string }[];
+};
 
-export default function GroupMatchHistory({
-  groupMatches,
-}: GroupMatchHistoryProps) {
+export default function GroupMatchHistory() {
+  const [groupMatches, setGroupMatches] = useState<GroupMatchEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  useEffect(() => {
+    fetch("/api/group-matches")
+      .then((r) => r.json())
+      .then((data: GroupMatchEntry[]) => {
+        setGroupMatches(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div>
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
+          <Users className="h-4 w-4" />
+          Group Matches
+        </h2>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 text-center text-sm text-zinc-500">
+          Loading…
+        </div>
+      </div>
+    );
+  }
 
   if (groupMatches.length === 0) {
     return (
