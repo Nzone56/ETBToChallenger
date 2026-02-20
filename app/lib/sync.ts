@@ -13,6 +13,7 @@ import {
   storeGroupMatches,
   getMatchesByPuuid,
   getDb,
+  type SlimGroupMatch,
 } from "./db";
 import { aggregatePlayerStats, findGroupMatches } from "./helpers";
 import type { LeagueEntry, Match, Summoner } from "../types/riot";
@@ -280,12 +281,28 @@ export async function syncAllPlayers(): Promise<{
     );
     const grouped = findGroupMatches(allPlayerMatches);
     await storeGroupMatches(
-      grouped.map(({ match, players }) => ({
-        matchId: match.metadata.matchId,
-        matchData: match,
-        playerList: players,
-        playedAt: match.info.gameStartTimestamp,
-      })),
+      grouped.map(({ match, players }) => {
+        const slim: SlimGroupMatch = {
+          metadata: { matchId: match.metadata.matchId },
+          info: {
+            gameDuration: match.info.gameDuration,
+            participants: match.info.participants.map((p) => ({
+              puuid: p.puuid,
+              win: p.win,
+              championName: p.championName,
+              kills: p.kills,
+              deaths: p.deaths,
+              assists: p.assists,
+            })),
+          },
+        };
+        return {
+          matchId: match.metadata.matchId,
+          matchData: slim,
+          playerList: players,
+          playedAt: match.info.gameStartTimestamp,
+        };
+      }),
     );
     console.log(`[DB  ✓] Stored ${grouped.length} group matches`);
   } catch (err) {

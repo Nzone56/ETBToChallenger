@@ -78,6 +78,12 @@ export const EMPTY_STATS: PlayerAggregatedStats = {
   nonSuppGames: 0,
   avgVisionScore: 0,
   avgKillParticipation: 0,
+  firstBloodParticipation: 0,
+  avgDmgToBuildings: 0,
+  avgDmgToObjectives: 0,
+  avgGoldLead: 0,
+  avgDmgLead: 0,
+  goldLeadGames: 0,
   championStats: [],
   roleStats: [],
   primaryRole: null,
@@ -115,6 +121,12 @@ export function aggregatePlayerStats(
       nonSuppGames: 0,
       avgVisionScore: 0,
       avgKillParticipation: 0,
+      firstBloodParticipation: 0,
+      avgDmgToBuildings: 0,
+      avgDmgToObjectives: 0,
+      avgGoldLead: 0,
+      avgDmgLead: 0,
+      goldLeadGames: 0,
       championStats: [],
       roleStats: [],
       primaryRole: null,
@@ -136,6 +148,12 @@ export function aggregatePlayerStats(
   let totalVision = 0;
   let totalKillParticipation = 0;
   let wins = 0;
+  let firstBloodCount = 0;
+  let totalDmgToBuildings = 0;
+  let totalDmgToObjectives = 0;
+  let totalGoldLead = 0;
+  let totalDmgLead = 0;
+  let goldLeadGames = 0;
 
   const champMap = new Map<
     string,
@@ -187,6 +205,28 @@ export function aggregatePlayerStats(
       .reduce((sum, tp) => sum + tp.kills, 0);
     if (teamKills > 0) {
       totalKillParticipation += (p.kills + p.assists) / teamKills;
+    }
+
+    // First blood participation
+    if (p.firstBloodKill || p.firstBloodAssist) firstBloodCount++;
+
+    // Damage to buildings/objectives (no supp)
+    if (!isSupport) {
+      totalDmgToBuildings += p.damageDealtToBuildings ?? 0;
+      totalDmgToObjectives += p.damageDealtToObjectives ?? 0;
+    }
+
+    // Gold lead & damage lead vs lane opponent (same teamPosition, enemy team)
+    if (p.teamPosition && p.teamPosition !== "") {
+      const opponent = match.info.participants.find(
+        (op) => op.teamId !== p.teamId && op.teamPosition === p.teamPosition,
+      );
+      if (opponent) {
+        totalGoldLead += p.goldEarned - opponent.goldEarned;
+        totalDmgLead +=
+          p.totalDamageDealtToChampions - opponent.totalDamageDealtToChampions;
+        goldLeadGames++;
+      }
     }
 
     // Champion stats
@@ -271,6 +311,14 @@ export function aggregatePlayerStats(
     nonSuppGames,
     avgVisionScore: totalVision / total,
     avgKillParticipation: (totalKillParticipation / total) * 100,
+    firstBloodParticipation: (firstBloodCount / total) * 100,
+    avgDmgToBuildings:
+      nonSuppGames > 0 ? totalDmgToBuildings / nonSuppGames : 0,
+    avgDmgToObjectives:
+      nonSuppGames > 0 ? totalDmgToObjectives / nonSuppGames : 0,
+    avgGoldLead: goldLeadGames > 0 ? totalGoldLead / goldLeadGames : 0,
+    avgDmgLead: goldLeadGames > 0 ? totalDmgLead / goldLeadGames : 0,
+    goldLeadGames,
     championStats,
     roleStats,
     primaryRole,
@@ -348,6 +396,18 @@ export function computeBestOfChallenge(
     return entries.slice(0, 3);
   }
 
+  // Gold/dmg lead: uses goldLeadGames as game count
+  const leadStat = (
+    field: keyof PlayerAggregatedStats,
+    desc: boolean,
+  ): RankedEntry[] =>
+    rank(
+      (s, gn) => [
+        { gameName: gn, value: s[field] as number, games: s.goldLeadGames },
+      ],
+      desc,
+    );
+
   const best: Record<StatCategory, RankedEntry[]> = {
     winrate: simple("winrate", true),
     kda: simple("avgKda", true),
@@ -360,6 +420,11 @@ export function computeBestOfChallenge(
     killParticipation: simple("avgKillParticipation", true),
     vision: simple("avgVisionScore", true),
     bestChampion: champRank(true),
+    firstBloodParticipation: simple("firstBloodParticipation", true),
+    dmgToBuildings: noSupp("avgDmgToBuildings", true),
+    dmgToObjectives: noSupp("avgDmgToObjectives", true),
+    goldLead: leadStat("avgGoldLead", true),
+    dmgLead: leadStat("avgDmgLead", true),
   };
 
   const worst: Record<StatCategory, RankedEntry[]> = {
@@ -374,6 +439,11 @@ export function computeBestOfChallenge(
     killParticipation: simple("avgKillParticipation", false),
     vision: simple("avgVisionScore", false),
     bestChampion: champRank(false),
+    firstBloodParticipation: simple("firstBloodParticipation", false),
+    dmgToBuildings: noSupp("avgDmgToBuildings", false),
+    dmgToObjectives: noSupp("avgDmgToObjectives", false),
+    goldLead: leadStat("avgGoldLead", false),
+    dmgLead: leadStat("avgDmgLead", false),
   };
 
   return { best, worst };

@@ -6,10 +6,11 @@ import {
   getGroupMatches,
   getLatestSyncedAt,
 } from "@/app/lib/db";
-import { getParticipant, EMPTY_STATS } from "@/app/lib/helpers";
-import type { Summoner, PlayerAggregatedStats, Match } from "@/app/types/riot";
+import { EMPTY_STATS } from "@/app/lib/helpers";
+import type { Summoner, PlayerAggregatedStats } from "@/app/types/riot";
 import TeamOverview from "@/app/components/team/TeamOverview";
 import InternalRankings from "@/app/components/team/InternalRankings";
+import FinalRankings from "@/app/components/team/FinalRankings";
 import GroupMatchHistory from "@/app/components/team/GroupMatchHistory";
 import SyncTrigger from "@/app/components/SyncTrigger";
 
@@ -45,14 +46,12 @@ export default async function TeamPage() {
     };
   });
 
-  // Calculate group wins from precomputed group matches
-  const typedGroupMatches = groupMatches as unknown as {
-    match: Match;
-    players: { puuid: string; gameName: string }[];
-  }[];
-  const groupWins = typedGroupMatches.filter(({ match, players }) => {
+  // Calculate group wins from precomputed slim group matches
+  const groupWins = groupMatches.filter(({ match, players }) => {
     const firstPlayer = players[0];
-    const p = getParticipant(match, firstPlayer.puuid);
+    const p = match.info.participants.find(
+      (pt) => pt.puuid === firstPlayer.puuid,
+    );
     return p?.win;
   }).length;
 
@@ -78,11 +77,14 @@ export default async function TeamPage() {
           version={version}
         />
 
+        {/* Final Rankings — avg position across all stat categories */}
+        <FinalRankings players={playerStatsData} version={version} />
+
         {/* Internal Rankings (client component for sorting) */}
         <InternalRankings players={playerStatsData} version={version} />
 
         {/* Group Match History */}
-        <GroupMatchHistory groupMatches={typedGroupMatches} />
+        <GroupMatchHistory groupMatches={groupMatches} />
       </div>
     </main>
   );

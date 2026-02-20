@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Match } from "@/app/types/riot";
-import { getParticipant, calcKda, formatKda } from "@/app/lib/helpers";
+import { type SlimGroupMatch } from "@/app/lib/db";
+import { calcKda, formatKda } from "@/app/lib/helpers";
 import { cn } from "@/app/lib/utils";
 import { Users, ChevronDown } from "lucide-react";
 
@@ -10,7 +10,7 @@ const PAGE_SIZE = 10;
 
 interface GroupMatchHistoryProps {
   groupMatches: {
-    match: Match;
+    match: SlimGroupMatch;
     players: { puuid: string; gameName: string }[];
   }[];
 }
@@ -44,11 +44,15 @@ export default function GroupMatchHistory({
       <div className="space-y-2 stagger-rows">
         {visible.map(({ match, players }) => {
           const allWin = players.every((pl) => {
-            const p = getParticipant(match, pl.puuid);
+            const p = match.info.participants.find(
+              (pt) => pt.puuid === pl.puuid,
+            );
             return p?.win;
           });
           const allLoss = players.every((pl) => {
-            const p = getParticipant(match, pl.puuid);
+            const p = match.info.participants.find(
+              (pt) => pt.puuid === pl.puuid,
+            );
             return p && !p.win;
           });
 
@@ -91,7 +95,9 @@ export default function GroupMatchHistory({
               {/* Players in this match */}
               <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                 {players.map((pl) => {
-                  const p = getParticipant(match, pl.puuid);
+                  const p = match.info.participants.find(
+                    (pt) => pt.puuid === pl.puuid,
+                  );
                   if (!p) return null;
 
                   const kda = calcKda(p.kills, p.deaths, p.assists);

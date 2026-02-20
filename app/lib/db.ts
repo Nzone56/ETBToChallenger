@@ -158,6 +158,66 @@ export async function getLastMatchByPuuid(
   return _getLastMatchByPuuid(puuid);
 }
 
+export interface PentakillEvent {
+  gameName: string;
+  puuid: string;
+  championName: string;
+  pentaKills: number;
+  playedAt: number;
+  matchId: string;
+}
+
+const _getPentakillEvents = unstable_cache(
+  async (puuids: string[]): Promise<PentakillEvent[]> => {
+    await ensureSchema();
+    const db = getDb();
+    const events: PentakillEvent[] = [];
+    for (const puuid of puuids) {
+      const res = await db.execute({
+        sql: `SELECT m.match_id, m.data, pm.played_at FROM matches m
+              JOIN player_matches pm ON pm.match_id = m.match_id
+              WHERE pm.puuid = ?
+              ORDER BY pm.played_at DESC`,
+        args: [puuid],
+      });
+      for (const row of res.rows) {
+        const match = JSON.parse(row.data as string) as {
+          metadata: { matchId: string };
+          info: {
+            participants: {
+              puuid: string;
+              pentaKills: number;
+              championName: string;
+              riotIdGameName?: string;
+            }[];
+          };
+        };
+        const p = match.info.participants.find((pt) => pt.puuid === puuid);
+        if (p && p.pentaKills > 0) {
+          events.push({
+            gameName: p.riotIdGameName ?? puuid,
+            puuid,
+            championName: p.championName,
+            pentaKills: p.pentaKills,
+            playedAt: row.played_at as number,
+            matchId: match.metadata.matchId,
+          });
+        }
+      }
+    }
+    events.sort((a, b) => b.playedAt - a.playedAt);
+    return events;
+  },
+  ["pentakill-events"],
+  { tags: [DB_TAG], revalidate: 900 },
+);
+
+export async function getPentakillEvents(
+  puuids: string[],
+): Promise<PentakillEvent[]> {
+  return _getPentakillEvents(puuids);
+}
+
 export async function storeMatches(
   matches: { matchId: string; data: object; playedAt: number }[],
 ): Promise<void> {
@@ -381,10 +441,25 @@ export async function getLatestSyncedAt(): Promise<number | null> {
 
 // ─── Group matches (precomputed during sync) ───
 
+export interface SlimGroupMatch {
+  metadata: { matchId: string };
+  info: {
+    gameDuration: number;
+    participants: {
+      puuid: string;
+      win: boolean;
+      championName: string;
+      kills: number;
+      deaths: number;
+      assists: number;
+    }[];
+  };
+}
+
 export async function storeGroupMatches(
   entries: {
     matchId: string;
-    matchData: object;
+    matchData: SlimGroupMatch;
     playerList: { puuid: string; gameName: string }[];
     playedAt: number;
   }[],
@@ -407,29 +482,27 @@ export async function storeGroupMatches(
   }
 }
 
-const _getGroupMatches = unstable_cache(
-  async () => {
+// Slim payload after first sync (~50KB), but may be large with old full-blob rows.
+// React cache() deduplicates within a single request.
+// Cross-request caching handled by ISR (revalidate=900) on /team page.
+export const getGroupMatches = cache(
+  async (): Promise<
+    { match: SlimGroupMatch; players: { puuid: string; gameName: string }[] }[]
+  > => {
     await ensureSchema();
     const db = getDb();
     const res = await db.execute(
       "SELECT match_data, player_list FROM group_matches ORDER BY played_at DESC",
     );
     return res.rows.map((r) => ({
-      match: JSON.parse(r.match_data as string),
+      match: JSON.parse(r.match_data as string) as SlimGroupMatch,
       players: JSON.parse(r.player_list as string) as {
         puuid: string;
         gameName: string;
       }[],
     }));
   },
-  ["group-matches"],
-  { tags: [DB_TAG], revalidate: 900 },
 );
-export async function getGroupMatches(): Promise<
-  { match: object; players: { puuid: string; gameName: string }[] }[]
-> {
-  return _getGroupMatches();
-}
 
 // ─── DB stats ───
 

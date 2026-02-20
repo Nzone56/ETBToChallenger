@@ -99,6 +99,9 @@ export interface MatchParticipant {
   quadraKills: number;
   pentaKills: number;
   firstBloodKill: boolean;
+  firstBloodAssist: boolean;
+  damageDealtToBuildings: number;
+  damageDealtToObjectives: number;
   turretKills: number;
   inhibitorKills: number;
 }
@@ -188,6 +191,12 @@ export interface PlayerAggregatedStats {
   nonSuppGames: number;
   avgVisionScore: number;
   avgKillParticipation: number;
+  firstBloodParticipation: number;
+  avgDmgToBuildings: number;
+  avgDmgToObjectives: number;
+  avgGoldLead: number;
+  avgDmgLead: number;
+  goldLeadGames: number;
   championStats: ChampionStats[];
   roleStats: RoleStats[];
   primaryRole: Position | null;
@@ -212,7 +221,12 @@ export type StatCategory =
   | "assists"
   | "killParticipation"
   | "vision"
-  | "bestChampion";
+  | "bestChampion"
+  | "firstBloodParticipation"
+  | "dmgToBuildings"
+  | "dmgToObjectives"
+  | "goldLead"
+  | "dmgLead";
 
 export interface BestOfChallenge {
   best: Record<StatCategory, RankedEntry[]>;
