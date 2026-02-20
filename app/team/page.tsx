@@ -1,57 +1,66 @@
 import { users } from "@/app/data/users";
+import { getDdragonVersion } from "@/app/lib/service";
 import {
-  getAllSeasonMatches,
-  getDdragonVersion,
-  getSummoner,
-} from "@/app/lib/service";
+  getAllRankedSnapshots,
+  getAllPlayerStats,
+  getMatchesByPuuid,
+  getLatestSyncedAt,
+} from "@/app/lib/db";
 import {
-  aggregatePlayerStats,
   findGroupMatches,
   getParticipant,
+  EMPTY_STATS,
 } from "@/app/lib/helpers";
-import { QUEUE_FLEX } from "@/app/data/constants";
+import type { Summoner, PlayerAggregatedStats, Match } from "@/app/types/riot";
 import TeamOverview from "@/app/components/team/TeamOverview";
 import InternalRankings from "@/app/components/team/InternalRankings";
 import GroupMatchHistory from "@/app/components/team/GroupMatchHistory";
+import SyncTrigger from "@/app/components/SyncTrigger";
 
 export const revalidate = 120;
 
 export default async function TeamPage() {
-  const version = await getDdragonVersion();
+  const [snapshots, statsRows, version] = await Promise.all([
+    Promise.resolve(getAllRankedSnapshots()),
+    Promise.resolve(getAllPlayerStats()),
+    getDdragonVersion(),
+  ]);
+  const syncedAt = getLatestSyncedAt();
 
-  // Fetch ALL season flex matches + summoner data for all players
-  const allPlayerMatches = await Promise.all(
-    users.map(async (user) => {
-      try {
-        const [matches, summoner] = await Promise.all([
-          getAllSeasonMatches(user.puuid, QUEUE_FLEX),
-          getSummoner(user.puuid).catch(() => null),
-        ]);
-        return {
-          puuid: user.puuid,
-          gameName: user.gameName,
-          matches,
-          profileIconId: summoner?.profileIconId ?? null,
-        };
-      } catch {
-        return {
-          puuid: user.puuid,
-          gameName: user.gameName,
-          matches: [],
-          profileIconId: null,
-        };
-      }
-    }),
-  );
+  const snapshotMap = new Map(snapshots.map((s) => [s.puuid, s]));
+  const statsMap = new Map(statsRows.map((r) => [r.puuid, r]));
+  const dbEmpty = snapshots.length === 0;
 
-  // Aggregate stats per player
-  const playerStatsData = allPlayerMatches.map(
-    ({ puuid, gameName, matches, profileIconId }) => ({
-      gameName,
-      profileIconId,
-      stats: aggregatePlayerStats(puuid, matches),
-    }),
-  );
+  // Build per-player data from DB (0 Riot calls)
+  const allPlayerMatches = users.map((user) => {
+    const snap = snapshotMap.get(user.puuid);
+    const summoner: Summoner | null = snap?.summonerJson
+      ? JSON.parse(snap.summonerJson)
+      : null;
+    const matches = getMatchesByPuuid(user.puuid) as Match[];
+    return {
+      puuid: user.puuid,
+      gameName: user.gameName,
+      matches,
+      profileIconId: summoner?.profileIconId ?? null,
+    };
+  });
+
+  const playerStatsData = users.map((user) => {
+    const snap = snapshotMap.get(user.puuid);
+    const statsRow = statsMap.get(user.puuid);
+    const summoner: Summoner | null = snap?.summonerJson
+      ? JSON.parse(snap.summonerJson)
+      : null;
+    const stats: PlayerAggregatedStats | null = statsRow?.statsJson
+      ? JSON.parse(statsRow.statsJson)
+      : null;
+    return {
+      gameName: user.gameName,
+      profileIconId: summoner?.profileIconId ?? null,
+      stats: stats ?? EMPTY_STATS,
+    };
+  });
 
   // Find group matches (2+ members played together)
   const groupMatches = findGroupMatches(allPlayerMatches);
@@ -65,6 +74,7 @@ export default async function TeamPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <SyncTrigger dbEmpty={dbEmpty} syncedAt={syncedAt} />
       <div className="space-y-8 stagger-children">
         {/* Page Title */}
         <div>

@@ -1,37 +1,100 @@
+import { getDdragonVersion } from "./lib/service";
 import {
-  getDashboardData,
-  getDdragonVersion,
-  getAllSeasonMatches,
-} from "./lib/service";
-import { logApiSummary } from "./lib/client";
+  getAllRankedSnapshots,
+  getAllPlayerStats,
+  getMatchesByPuuid,
+  getLatestSyncedAt,
+} from "./lib/db";
 import {
   computeAverageElo,
   computeBestOfChallenge,
-  aggregatePlayerStats,
   lpToTier,
+  EMPTY_STATS,
 } from "./lib/helpers";
-import { rankToLp, QUEUE_FLEX } from "./data/constants";
-import { RankTier } from "./types/riot";
+import { rankToLp } from "./data/constants";
+import { users } from "./data/users";
+import type {
+  RankTier,
+  Summoner,
+  LeagueEntry,
+  PlayerAggregatedStats,
+  Match,
+} from "./types/riot";
 import ChallengeHeader from "./components/dashboard/ChallengeHeader";
 import Leaderboard from "./components/dashboard/Leaderboard";
 import PlayerCard from "./components/dashboard/PlayerCard";
 import BestOfSection from "./components/dashboard/BestOfSection";
 import RoleLeaderboard from "./components/dashboard/RoleLeaderboard";
+import SyncTrigger from "./components/SyncTrigger";
 
+// Revalidate every 2 minutes — but pages read from DB, not Riot
 export const revalidate = 120;
 
 export default async function Home() {
-  const [dashboardData, version] = await Promise.all([
-    getDashboardData(),
+  const [snapshots, statsRows, version] = await Promise.all([
+    Promise.resolve(getAllRankedSnapshots()),
+    Promise.resolve(getAllPlayerStats()),
     getDdragonVersion(),
   ]);
+  const syncedAt = getLatestSyncedAt();
 
-  // Compute average Elo
+  const snapshotMap = new Map(snapshots.map((s) => [s.puuid, s]));
+  const statsMap = new Map(statsRows.map((r) => [r.puuid, r]));
+  const dbEmpty = snapshots.length === 0;
+
+  // Build dashboard data from DB (0 Riot calls)
+  const dashboardData = users.map((user) => {
+    const snap = snapshotMap.get(user.puuid);
+    const summoner: Summoner | null = snap?.summonerJson
+      ? JSON.parse(snap.summonerJson)
+      : null;
+    const flexEntry: LeagueEntry | null = snap?.flexEntryJson
+      ? JSON.parse(snap.flexEntryJson)
+      : null;
+    const matches = getMatchesByPuuid(user.puuid) as Match[];
+    return {
+      puuid: user.puuid,
+      gameName: user.gameName,
+      tagLine: user.tagLine,
+      summoner,
+      flexEntry,
+      lastMatch: matches[0] ?? null,
+    };
+  });
+
+  const playerStatsData = users.map((user) => {
+    const snap = snapshotMap.get(user.puuid);
+    const statsRow = statsMap.get(user.puuid);
+    const summoner: Summoner | null = snap?.summonerJson
+      ? JSON.parse(snap.summonerJson)
+      : null;
+    const stats: PlayerAggregatedStats | null = statsRow?.statsJson
+      ? JSON.parse(statsRow.statsJson)
+      : null;
+    return {
+      gameName: user.gameName,
+      profileIconId: summoner?.profileIconId ?? null,
+      stats: stats ?? EMPTY_STATS,
+    };
+  });
+
+  const eligibleForBestOf = playerStatsData.filter(
+    (p) => p.stats && (p.stats as PlayerAggregatedStats).totalGames > 0,
+  ) as {
+    gameName: string;
+    stats: PlayerAggregatedStats;
+    profileIconId: number | null;
+  }[];
+
+  const bestOf =
+    eligibleForBestOf.length > 0
+      ? computeBestOfChallenge(eligibleForBestOf)
+      : null;
+
   const { avgLp, avgTierLabel } = computeAverageElo(
     dashboardData.map((p) => p.flexEntry),
   );
 
-  // Per-player LP data for expandable progress bars
   const playerLpData = dashboardData.map((p) => {
     const totalLp = p.flexEntry
       ? rankToLp(p.flexEntry.tier, p.flexEntry.rank, p.flexEntry.leaguePoints)
@@ -46,70 +109,56 @@ export default async function Home() {
     };
   });
 
-  // Fetch ALL season flex matches for "Best of" calculations
-  const playerStatsData = await Promise.all(
-    dashboardData.map(async (player) => {
-      try {
-        const matches = await getAllSeasonMatches(player.puuid, QUEUE_FLEX);
-        const stats = aggregatePlayerStats(player.puuid, matches);
-        return {
-          gameName: player.gameName,
-          profileIconId: player.summoner?.profileIconId ?? null,
-          stats,
-        };
-      } catch {
-        return {
-          gameName: player.gameName,
-          profileIconId: player.summoner?.profileIconId ?? null,
-          stats: aggregatePlayerStats(player.puuid, []),
-        };
-      }
-    }),
-  );
-
-  const bestOf = computeBestOfChallenge(playerStatsData);
-
-  logApiSummary();
-
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      {/* Background sync trigger — fires after render, no blocking */}
+      <SyncTrigger dbEmpty={dbEmpty} syncedAt={syncedAt} />
+
       <div className="space-y-8 stagger-children">
-        {/* Challenge Title & Global Progress */}
-        <ChallengeHeader
-          avgLp={avgLp}
-          avgTierLabel={avgTierLabel}
-          avgTier={lpToTier(avgLp) as RankTier}
-          playerCount={dashboardData.length}
-          players={playerLpData}
-        />
-
-        {/* Best of the Challenge */}
-        <BestOfSection best={bestOf} />
-
-        {/* Main grid: Leaderboards + Player Cards */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Leaderboards */}
-          <div className="lg:col-span-1 space-y-4">
-            <Leaderboard players={dashboardData} version={version} />
-            <RoleLeaderboard players={playerStatsData} version={version} />
+        {dbEmpty ? (
+          <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-center">
+            <p className="text-lg font-semibold text-zinc-300">
+              Syncing data for the first time…
+            </p>
+            <p className="text-sm text-zinc-500">
+              This takes a few minutes on first load. The page will refresh
+              automatically.
+            </p>
           </div>
+        ) : (
+          <>
+            <ChallengeHeader
+              avgLp={avgLp}
+              avgTierLabel={avgTierLabel}
+              avgTier={lpToTier(avgLp) as RankTier}
+              playerCount={dashboardData.length}
+              players={playerLpData}
+            />
 
-          {/* Player Cards */}
-          <div className="lg:col-span-2">
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-              Player Cards
-            </h2>
-            <div className="grid grid-cols-1 gap-3 stagger-grid">
-              {dashboardData.map((player) => (
-                <PlayerCard
-                  key={player.puuid}
-                  player={player}
-                  version={version}
-                />
-              ))}
+            {bestOf && <BestOfSection best={bestOf} />}
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-1 space-y-4">
+                <Leaderboard players={dashboardData} version={version} />
+                <RoleLeaderboard players={playerStatsData} version={version} />
+              </div>
+              <div className="lg:col-span-2">
+                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-400">
+                  Player Cards
+                </h2>
+                <div className="grid grid-cols-1 gap-3 stagger-grid">
+                  {dashboardData.map((player) => (
+                    <PlayerCard
+                      key={player.puuid}
+                      player={player}
+                      version={version}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </main>
   );
