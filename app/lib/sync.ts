@@ -12,6 +12,7 @@ import {
   upsertSyncLog,
   storeGroupMatches,
   getMatchesByPuuid,
+  getSyncLog,
   getDb,
   type SlimGroupMatch,
 } from "./db";
@@ -57,7 +58,7 @@ async function throttle(): Promise<void> {
 async function riotGet<T>(
   url: string,
   label: string,
-  revalidate = 300,
+  revalidate = 0, // default: no cache — sync must always see the latest data
 ): Promise<T> {
   await throttle();
   console.log(`[RIOT →] ${label}  ${url}`);
@@ -75,11 +76,19 @@ async function riotGetMatch(matchId: string): Promise<Match> {
   return result;
 }
 
-// ─── Fetch all season match IDs for a player from Riot ───
+// ─── Fetch match IDs for a player from Riot ───
+// If sinceEpochMs is provided, only fetches IDs since that timestamp (incremental).
+// Falls back to full season fetch when sinceEpochMs is null (first sync).
 async function fetchAllMatchIds(
   puuid: string,
   gameName: string,
+  sinceEpochMs: number | null,
 ): Promise<string[]> {
+  // Use the later of: season start OR last sync time (converted to seconds)
+  const startTimeSec = sinceEpochMs
+    ? Math.floor(sinceEpochMs / 1000)
+    : SEASON_START_SECONDS;
+
   const all: string[] = [];
   let start = 0;
   let page = 1;
@@ -89,11 +98,11 @@ async function fetchAllMatchIds(
       QUEUE_FLEX,
       PAGE_SIZE,
       start,
-      SEASON_START_SECONDS,
+      startTimeSec,
     );
     const ids = await riotGet<string[]>(
       url,
-      `MATCH_IDS page ${page} (${gameName})`,
+      `MATCH_IDS page ${page} (${gameName})${sinceEpochMs ? " [incremental]" : " [full season]"}`,
     );
     all.push(...ids);
     if (ids.length < PAGE_SIZE) break;
@@ -144,8 +153,13 @@ export async function syncPlayer(
   });
   console.log(`[DB  ✓] Upserted ranked snapshot for ${user.gameName}`);
 
-  // 2. Get all season match IDs from Riot for this player
-  const riotIds = await fetchAllMatchIds(puuid, user.gameName);
+  // 2. Get match IDs from Riot — incremental (since last sync) or full season on first run
+  const syncLog = await getSyncLog(puuid);
+  const riotIds = await fetchAllMatchIds(
+    puuid,
+    user.gameName,
+    syncLog?.lastSync ?? null,
+  );
 
   // 3. Diff against DB (both async now)
   const [linkedIds, globalIds] = await Promise.all([
