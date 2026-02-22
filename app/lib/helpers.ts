@@ -186,7 +186,7 @@ export function aggregatePlayerStats(
     const cs = p.totalMinionsKilled + p.neutralMinionsKilled;
     totalCs += cs;
     totalCsPerMin += calcCsPerMin(cs, match.info.gameDuration);
-    totalVision += p.visionScore;
+    totalVision += durationMin > 0 ? p.visionScore / durationMin : 0;
     if (p.win) wins++;
 
     // Non-support stats (DMG/min, CS/min, Gold/min excluding support games)

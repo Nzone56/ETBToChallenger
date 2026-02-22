@@ -81,7 +81,7 @@ export async function riotFetch<T>(
       headers: {
         "X-Riot-Token": API_KEY,
       },
-      next: { revalidate },
+      ...(revalidate === 0 ? { cache: "no-store" } : { next: { revalidate } }),
     });
 
     const ms = Date.now() - start;

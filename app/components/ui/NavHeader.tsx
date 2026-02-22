@@ -13,12 +13,14 @@ import {
   ChevronDown,
   Menu,
   X,
+  Trophy,
 } from "lucide-react";
 import { users } from "@/app/data/users";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/team", label: "Team Analytics", icon: Users },
+  { href: "/records", label: "Records", icon: Trophy },
 ];
 
 export default function NavHeader() {

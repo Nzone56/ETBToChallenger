@@ -1,34 +1,32 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 interface SyncTriggerProps {
   dbEmpty: boolean;
   syncedAt?: number | null; // unix ms of last sync (from DB)
 }
 
-// Re-sync only if data is older than 15 minutes (matches page cache duration)
+// Re-sync when data is older than 15 minutes
 const SYNC_INTERVAL_MS = 15 * 60 * 1000;
-// Session key — ensures only ONE sync fires per browser tab session
-const SESSION_KEY = "etb_sync_fired";
 
-// Fires a background POST /api/sync at most once per browser session,
-// and only when data is stale (>15min) or the DB is empty.
-// The server-side lock also blocks concurrent syncs from multiple tabs.
+// Fires POST /api/sync whenever data is stale (>15min) or DB is empty.
+// Deduplication is handled server-side via syncInProgress lock.
+// After a successful sync with new matches, reloads the page so ISR serves fresh data.
 export default function SyncTrigger({ dbEmpty, syncedAt }: SyncTriggerProps) {
+  const hasFired = useRef(false);
+
   useEffect(() => {
     const isStale =
       dbEmpty || !syncedAt || Date.now() - syncedAt > SYNC_INTERVAL_MS;
     if (!isStale) return;
+    if (hasFired.current) return;
+    hasFired.current = true;
 
-    // Only use sessionStorage to deduplicate when data is NOT empty
-    // (if DB is empty we must always attempt a sync)
-    if (!dbEmpty && sessionStorage.getItem(SESSION_KEY)) return;
-
-    sessionStorage.setItem(SESSION_KEY, "1");
-    console.log(
-      `[SyncTrigger] Firing sync (dbEmpty=${dbEmpty}, age=${syncedAt ? Math.round((Date.now() - syncedAt) / 1000) + "s" : "unknown"})`,
-    );
+    const ageS = syncedAt
+      ? Math.round((Date.now() - syncedAt) / 60_000) + "min"
+      : "unknown";
+    console.log(`[SyncTrigger] Firing sync (dbEmpty=${dbEmpty}, age=${ageS})`);
 
     fetch("/api/sync", { method: "POST" })
       .then((res) => res.json())
@@ -37,12 +35,16 @@ export default function SyncTrigger({ dbEmpty, syncedAt }: SyncTriggerProps) {
           console.log("[SyncTrigger] Server already syncing — skipped");
           return;
         }
-        console.log(`[SyncTrigger] Done — ${data.totalNew ?? 0} new matches`);
-        if (dbEmpty) window.location.reload();
+        const newMatches = data.totalNew ?? 0;
+        console.log(`[SyncTrigger] Done — ${newMatches} new matches`);
+        // Reload whenever sync ran (new matches found OR DB was empty)
+        if (dbEmpty || newMatches > 0) {
+          window.location.reload();
+        }
       })
       .catch((err) => {
         console.error("[SyncTrigger] Error:", err);
-        sessionStorage.removeItem(SESSION_KEY); // allow retry on next visit
+        hasFired.current = false; // allow retry on next render
       });
   }, [dbEmpty, syncedAt]);
 
