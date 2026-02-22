@@ -4,7 +4,6 @@ import {
   getAllPlayerStats,
   getLastMatchByPuuid,
   getLatestSyncedAt,
-  getPentakillEvents,
 } from "./lib/db";
 import {
   computeAverageElo,
@@ -26,29 +25,20 @@ import Leaderboard from "./components/dashboard/Leaderboard";
 import PlayerCard from "./components/dashboard/PlayerCard";
 import BestOfSection from "./components/dashboard/BestOfSection";
 import RoleLeaderboard from "./components/dashboard/RoleLeaderboard";
-import PentakillCounter from "./components/dashboard/PentakillCounter";
 import SyncTrigger from "./components/SyncTrigger";
 
 // Revalidate every 15 minutes — unstable_cache prevents redundant DB reads
 export const revalidate = 900;
 
 export default async function Home() {
-  const puuids = users.map((u) => u.puuid);
-  const [
-    snapshots,
-    statsRows,
-    lastMatches,
-    pentakillEvents,
-    version,
-    syncedAt,
-  ] = await Promise.all([
-    getAllRankedSnapshots(),
-    getAllPlayerStats(),
-    Promise.all(users.map((u) => getLastMatchByPuuid(u.puuid))),
-    getPentakillEvents(puuids),
-    getDdragonVersion(),
-    getLatestSyncedAt(),
-  ]);
+  const [snapshots, statsRows, lastMatches, version, syncedAt] =
+    await Promise.all([
+      getAllRankedSnapshots(),
+      getAllPlayerStats(),
+      Promise.all(users.map((u) => getLastMatchByPuuid(u.puuid))),
+      getDdragonVersion(),
+      getLatestSyncedAt(),
+    ]);
 
   const snapshotMap = new Map(snapshots.map((s) => [s.puuid, s]));
   const statsMap = new Map(statsRows.map((r) => [r.puuid, r]));
@@ -56,9 +46,6 @@ export default async function Home() {
     users.map((u, i) => [u.puuid, lastMatches[i] as Match | null]),
   );
   const dbEmpty = snapshots.length === 0;
-  const playerNames: Record<string, string> = Object.fromEntries(
-    users.map((u) => [u.puuid, u.gameName]),
-  );
 
   // Build dashboard data from DB (0 Riot calls)
   const dashboardData = users.map((user) => {
@@ -153,12 +140,6 @@ export default async function Home() {
             />
 
             {bestOf && <BestOfSection best={bestOf} />}
-
-            <PentakillCounter
-              events={pentakillEvents}
-              version={version}
-              playerNames={playerNames}
-            />
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="lg:col-span-1 space-y-4">

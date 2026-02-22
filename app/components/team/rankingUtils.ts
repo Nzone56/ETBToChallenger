@@ -80,7 +80,7 @@ export const STAT_MAP: Record<
   vision: {
     field: "avgVisionScore",
     desc: true,
-    format: (v) => v.toFixed(1),
+    format: (v) => v.toFixed(2),
   },
   firstBloodParticipation: {
     field: "firstBloodParticipation",

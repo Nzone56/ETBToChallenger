@@ -171,6 +171,8 @@ const _getPentakillEvents = unstable_cache(
   async (puuids: string[]): Promise<PentakillEvent[]> => {
     await ensureSchema();
     const db = getDb();
+    const { SEASON_START_EPOCH, QUEUE_FLEX } =
+      await import("../data/constants");
     const events: PentakillEvent[] = [];
     for (const puuid of puuids) {
       const res = await db.execute({
@@ -184,6 +186,8 @@ const _getPentakillEvents = unstable_cache(
         const match = JSON.parse(row.data as string) as {
           metadata: { matchId: string };
           info: {
+            gameStartTimestamp: number;
+            queueId: number;
             participants: {
               puuid: string;
               pentaKills: number;
@@ -192,6 +196,8 @@ const _getPentakillEvents = unstable_cache(
             }[];
           };
         };
+        if (match.info.gameStartTimestamp < SEASON_START_EPOCH) continue;
+        if (match.info.queueId !== QUEUE_FLEX) continue;
         const p = match.info.participants.find((pt) => pt.puuid === puuid);
         if (p && p.pentaKills > 0) {
           events.push({
@@ -517,6 +523,160 @@ export const getGroupMatches = cache(
     }));
   },
 );
+
+// ─── Match Records ───
+
+export interface MatchRecord {
+  category: string;
+  gameName: string;
+  puuid: string;
+  value: number;
+  championName: string;
+  playedAt: number;
+  matchId: string;
+  win: boolean;
+  // Extra context shown in the card
+  kills?: number;
+  deaths?: number;
+  assists?: number;
+  durationMin?: number;
+}
+
+const _getMatchRecords = unstable_cache(
+  async (puuids: string[]): Promise<MatchRecord[]> => {
+    await ensureSchema();
+    const db = getDb();
+    const { SEASON_START_EPOCH, QUEUE_FLEX } =
+      await import("../data/constants");
+
+    // Track best per category: key → MatchRecord
+    const best: Record<string, MatchRecord> = {};
+
+    function trySet(
+      category: string,
+      value: number,
+      candidate: Omit<MatchRecord, "category" | "value">,
+      higherIsBetter = true,
+    ) {
+      const current = best[category];
+      const isBetter =
+        !current ||
+        (higherIsBetter ? value > current.value : value < current.value);
+      if (isBetter) best[category] = { category, value, ...candidate };
+    }
+
+    for (const puuid of puuids) {
+      const res = await db.execute({
+        sql: `SELECT m.match_id, m.data, pm.played_at FROM matches m
+              JOIN player_matches pm ON pm.match_id = m.match_id
+              WHERE pm.puuid = ?
+              ORDER BY pm.played_at DESC`,
+        args: [puuid],
+      });
+
+      for (const row of res.rows) {
+        const match = JSON.parse(row.data as string) as {
+          metadata: { matchId: string };
+          info: {
+            gameDuration: number;
+            gameStartTimestamp: number;
+            queueId: number;
+            participants: {
+              puuid: string;
+              riotIdGameName?: string;
+              championName: string;
+              win: boolean;
+              kills: number;
+              deaths: number;
+              assists: number;
+              totalDamageDealtToChampions: number;
+              goldEarned: number;
+              totalMinionsKilled: number;
+              neutralMinionsKilled: number;
+              teamPosition: string;
+              teamId: number;
+            }[];
+          };
+        };
+
+        // Season + Flex queue filter + skip remakes (<10 min)
+        if (match.info.gameStartTimestamp < SEASON_START_EPOCH) continue;
+        if (match.info.queueId !== QUEUE_FLEX) continue;
+        if (match.info.gameDuration < 600) continue;
+
+        const p = match.info.participants.find((pt) => pt.puuid === puuid);
+        if (!p) continue;
+
+        const durationMin = match.info.gameDuration / 60;
+        const gameName = p.riotIdGameName ?? puuid;
+        const base = {
+          gameName,
+          puuid,
+          championName: p.championName,
+          playedAt: row.played_at as number,
+          matchId: match.metadata.matchId,
+          win: p.win,
+          kills: p.kills,
+          deaths: p.deaths,
+          assists: p.assists,
+          durationMin,
+        };
+
+        trySet("Most Kills", p.kills, base);
+        trySet("Most Deaths", p.deaths, base);
+        trySet("Most Assists", p.assists, base);
+
+        if (durationMin > 0) {
+          const dmgPerMin = p.totalDamageDealtToChampions / durationMin;
+          const goldPerMin = p.goldEarned / durationMin;
+          const cs = p.totalMinionsKilled + p.neutralMinionsKilled;
+          const csPerMin = cs / durationMin;
+          trySet("Highest DMG/min", dmgPerMin, base);
+          trySet("Highest Gold/min", goldPerMin, base);
+          trySet("Highest CS/min", csPerMin, base);
+          // Worst (excl supp)
+          if (p.teamPosition !== "UTILITY") {
+            trySet("Lowest DMG/min", dmgPerMin, base, false);
+            trySet("Lowest Gold/min", goldPerMin, base, false);
+            trySet("Lowest CS/min", csPerMin, base, false);
+          }
+        }
+
+        // Gold lead & DMG lead vs lane opponent (non-support only)
+        if (
+          p.teamPosition &&
+          p.teamPosition !== "" &&
+          p.teamPosition !== "UTILITY"
+        ) {
+          const opponent = match.info.participants.find(
+            (op) =>
+              op.teamId !== p.teamId && op.teamPosition === p.teamPosition,
+          );
+          if (opponent) {
+            const goldLead = p.goldEarned - opponent.goldEarned;
+            const dmgLead =
+              p.totalDamageDealtToChampions -
+              opponent.totalDamageDealtToChampions;
+            trySet("Highest Gold Lead", goldLead, base);
+            trySet("Highest DMG Lead", dmgLead, base);
+            trySet("Lowest Gold Lead", goldLead, base, false);
+            trySet("Lowest DMG Lead", dmgLead, base, false);
+          }
+        }
+      }
+    }
+
+    return Object.values(best);
+  },
+  ["match-records"],
+  { tags: [DB_TAG], revalidate: 900 },
+);
+
+export async function getMatchRecords(
+  puuids: string[],
+): Promise<MatchRecord[]> {
+  return _getMatchRecords(puuids);
+}
 
 // ─── DB stats ───
 
