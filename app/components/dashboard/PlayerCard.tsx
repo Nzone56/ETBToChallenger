@@ -7,6 +7,7 @@ import {
   formatWinrate,
 } from "@/app/lib/helpers";
 import { POSITION_LABELS, rankToLp } from "@/app/data/constants";
+import { computeCIR_v3 } from "@/app/lib/cir";
 import RankBadge from "@/app/components/ui/RankBadge";
 import KdaDisplay from "@/app/components/ui/KdaDisplay";
 import ChampionIcon from "@/app/components/ui/ChampionIcon";
@@ -14,6 +15,87 @@ import ProfileIcon from "@/app/components/ui/ProfileIcon";
 import WinrateBar from "@/app/components/ui/WinrateBar";
 import { cn } from "@/app/lib/utils";
 import { ChevronRight } from "lucide-react";
+
+function cirLabel(score: number): {
+  label: string;
+  color: string;
+  bg: string;
+  border: string;
+} {
+  if (score >= 20)
+    return {
+      label: "Legendary",
+      color: "text-yellow-300",
+      bg: "bg-yellow-500/10",
+      border: "border-yellow-500/30",
+    };
+  if (score >= 15)
+    return {
+      label: "Dominant",
+      color: "text-orange-300",
+      bg: "bg-orange-500/10",
+      border: "border-orange-500/30",
+    };
+  if (score >= 11)
+    return {
+      label: "Great",
+      color: "text-emerald-300",
+      bg: "bg-emerald-500/10",
+      border: "border-emerald-500/30",
+    };
+  if (score >= 8)
+    return {
+      label: "Good",
+      color: "text-sky-300",
+      bg: "bg-sky-500/10",
+      border: "border-sky-500/30",
+    };
+  if (score >= 5)
+    return {
+      label: "Average",
+      color: "text-zinc-300",
+      bg: "bg-zinc-500/10",
+      border: "border-zinc-600/30",
+    };
+  if (score >= 2)
+    return {
+      label: "Poor",
+      color: "text-red-400",
+      bg: "bg-red-500/10",
+      border: "border-red-600/30",
+    };
+  return {
+    label: "Awful",
+    color: "text-red-600",
+    bg: "bg-red-900/10",
+    border: "border-red-800/30",
+  };
+}
+
+function CirBadge({ score }: { score: number }) {
+  const { label, color, bg, border } = cirLabel(score);
+  return (
+    <div
+      className={cn(
+        "mt-1.5 flex items-center justify-end gap-1.5 rounded-md border px-2 py-1",
+        bg,
+        border,
+      )}
+    >
+      <span
+        className={cn("text-sm font-bold tabular-nums leading-none", color)}
+      >
+        {score.toFixed(1)}
+      </span>
+      <div className="flex flex-col items-start leading-none">
+        <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-500">
+          CIR
+        </span>
+        <span className={cn("text-[9px] font-semibold", color)}>{label}</span>
+      </div>
+    </div>
+  );
+}
 
 interface PlayerCardProps {
   player: PlayerDashboardData;
@@ -24,6 +106,64 @@ export default function PlayerCard({ player, version }: PlayerCardProps) {
   const lastMatchParticipant = player.lastMatch
     ? getParticipant(player.lastMatch, player.puuid)
     : null;
+
+  const cirScores = (() => {
+    if (!lastMatchParticipant || !player.lastMatch) return null;
+    const p = lastMatchParticipant;
+    const match = player.lastMatch;
+    const durationMin = match.info.gameDuration / 60;
+    if (durationMin <= 0) return null;
+
+    const teamKills = match.info.participants
+      .filter((tp) => tp.teamId === p.teamId)
+      .reduce((sum, tp) => sum + tp.kills, 0);
+    const kp = teamKills > 0 ? ((p.kills + p.assists) / teamKills) * 100 : 0;
+
+    const opponent = match.info.participants.find(
+      (op) => op.teamId !== p.teamId && op.teamPosition === p.teamPosition,
+    );
+    const goldLead = opponent ? p.goldEarned - opponent.goldEarned : 0;
+    const dmgLead = opponent
+      ? p.totalDamageDealtToChampions - opponent.totalDamageDealtToChampions
+      : 0;
+
+    const teamTotalDmg = match.info.participants
+      .filter((tp) => tp.teamId === p.teamId)
+      .reduce((sum, tp) => sum + tp.totalDamageDealtToChampions, 0);
+    const teamDmgPct =
+      teamTotalDmg > 0
+        ? (p.totalDamageDealtToChampions / teamTotalDmg) * 100
+        : 0;
+
+    const maxGPM = Math.max(
+      ...match.info.participants.map((pt) => pt.goldEarned / durationMin),
+    );
+
+    const input = {
+      kills: p.kills,
+      deaths: p.deaths,
+      assists: p.assists,
+      killParticipation: kp,
+      visionPerMin: p.visionScore / durationMin,
+      dmgToObjectives: p.damageDealtToObjectives ?? 0,
+      firstBloodParticipation: p.firstBloodKill || p.firstBloodAssist ? 100 : 0,
+      goldPerMin: p.goldEarned / durationMin,
+      csPerMin: (p.totalMinionsKilled + p.neutralMinionsKilled) / durationMin,
+      goldLead,
+      dmgPerMin: p.totalDamageDealtToChampions / durationMin,
+      dmgToBuildings: p.damageDealtToBuildings ?? 0,
+      dmgLead,
+      teamDamagePercent: teamDmgPct,
+      maxGameGoldPerMin: maxGPM,
+    };
+
+    const v3result = computeCIR_v3({ ...input, teamPosition: p.teamPosition });
+
+    return {
+      score: v3result.score,
+      role: v3result.role,
+    };
+  })();
 
   const total = player.flexEntry
     ? player.flexEntry.wins + player.flexEntry.losses
@@ -146,6 +286,7 @@ export default function PlayerCard({ player, version }: PlayerCardProps) {
               <div className="text-xs text-zinc-600">
                 {Math.floor(player.lastMatch.info.gameDuration / 60)}m
               </div>
+              {cirScores && <CirBadge score={cirScores.score} />}
             </div>
           </div>
         )}
