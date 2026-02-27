@@ -17,7 +17,8 @@ export type SortKey =
   | "dmgToBuildings"
   | "dmgToObjectives"
   | "goldLead"
-  | "dmgLead";
+  | "dmgLead"
+  | "cirAvg";
 
 export interface PlayerData {
   gameName: string;
@@ -42,6 +43,7 @@ export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "dmgToObjectives", label: "Obj" },
   { key: "goldLead", label: "G.Lead" },
   { key: "dmgLead", label: "D.Lead" },
+  { key: "cirAvg", label: "CIR" },
 ];
 
 export const STAT_MAP: Record<
@@ -112,6 +114,11 @@ export const STAT_MAP: Record<
       const sign = v >= 0 ? "+" : "";
       return `${sign}${Math.round(v).toLocaleString()}`;
     },
+  },
+  cirAvg: {
+    field: "avgCir",
+    desc: true,
+    format: (v) => v.toFixed(1),
   },
 };
 

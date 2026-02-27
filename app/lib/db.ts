@@ -505,6 +505,36 @@ export async function getGroupMatchCount(): Promise<number> {
   return _getGroupMatchCount();
 }
 
+const _getGroupMatchWins = unstable_cache(
+  async (): Promise<number> => {
+    await ensureSchema();
+    const db = getDb();
+    const res = await db.execute(
+      "SELECT match_data, player_list FROM group_matches",
+    );
+    let wins = 0;
+    for (const row of res.rows) {
+      const match = JSON.parse(row.match_data as string) as SlimGroupMatch;
+      const players = JSON.parse(row.player_list as string) as {
+        puuid: string;
+        gameName: string;
+      }[];
+      if (players.length === 0) continue;
+      const p = match.info.participants.find(
+        (pt) => pt.puuid === players[0].puuid,
+      );
+      if (p?.win) wins++;
+    }
+    return wins;
+  },
+  ["group-match-wins"],
+  { tags: [DB_TAG], revalidate: 900 },
+);
+
+export async function getGroupMatchWins(): Promise<number> {
+  return _getGroupMatchWins();
+}
+
 export const getGroupMatches = cache(
   async (): Promise<
     { match: SlimGroupMatch; players: { puuid: string; gameName: string }[] }[]
@@ -536,10 +566,32 @@ export interface MatchRecord {
   matchId: string;
   win: boolean;
   // Extra context shown in the card
-  kills?: number;
-  deaths?: number;
-  assists?: number;
+  kills: number;
+  deaths: number;
+  assists: number;
   durationMin?: number;
+  // CIR-specific
+  teamPosition?: string;
+  cirBreakdown?: {
+    combat: number;
+    utility: number;
+    economy: number;
+    pressure: number;
+  };
+  cirStats?: {
+    killParticipation: number;
+    visionPerMin: number;
+    dmgToObjectives: number;
+    firstBloodParticipation: number;
+    goldPerMin: number;
+    csPerMin: number;
+    goldLead: number;
+    dmgPerMin: number;
+    dmgToBuildings: number;
+    dmgLead: number;
+    teamDamagePercent: number;
+    maxGameGoldPerMin: number;
+  };
 }
 
 const _getMatchRecords = unstable_cache(
@@ -551,6 +603,8 @@ const _getMatchRecords = unstable_cache(
 
     // Track best per category: key → MatchRecord
     const best: Record<string, MatchRecord> = {};
+    // Top 15 CIR performances overall + per position
+    const cirAll: MatchRecord[] = [];
 
     function trySet(
       category: string,
@@ -595,6 +649,11 @@ const _getMatchRecords = unstable_cache(
               neutralMinionsKilled: number;
               teamPosition: string;
               teamId: number;
+              visionScore?: number;
+              damageDealtToObjectives?: number;
+              damageDealtToBuildings?: number;
+              firstBloodKill?: boolean;
+              firstBloodAssist?: boolean;
             }[];
           };
         };
@@ -663,10 +722,113 @@ const _getMatchRecords = unstable_cache(
             trySet("Lowest DMG Lead", dmgLead, base, false);
           }
         }
+
+        // CIR v3 — top performances
+        if (durationMin > 0) {
+          const { computeCIR_v3 } = await import("../lib/cir");
+          const teamKills = match.info.participants
+            .filter((tp) => tp.teamId === p.teamId)
+            .reduce((s, tp) => s + tp.kills, 0);
+          const kp =
+            teamKills > 0 ? ((p.kills + p.assists) / teamKills) * 100 : 0;
+          const opponent = match.info.participants.find(
+            (op) =>
+              op.teamId !== p.teamId && op.teamPosition === p.teamPosition,
+          );
+          const goldLead = opponent ? p.goldEarned - opponent.goldEarned : 0;
+          const dmgLead = opponent
+            ? p.totalDamageDealtToChampions -
+              opponent.totalDamageDealtToChampions
+            : 0;
+          const teamTotalDmg = match.info.participants
+            .filter((tp) => tp.teamId === p.teamId)
+            .reduce((s, tp) => s + tp.totalDamageDealtToChampions, 0);
+          const teamDmgPct =
+            teamTotalDmg > 0
+              ? (p.totalDamageDealtToChampions / teamTotalDmg) * 100
+              : 0;
+          const maxGPM = Math.max(
+            ...match.info.participants.map((pt) => pt.goldEarned / durationMin),
+          );
+          const cirResult = computeCIR_v3({
+            kills: p.kills,
+            deaths: p.deaths,
+            assists: p.assists,
+            killParticipation: kp,
+            visionPerMin: (p.visionScore ?? 0) / durationMin,
+            dmgToObjectives: p.damageDealtToObjectives ?? 0,
+            firstBloodParticipation:
+              p.firstBloodKill || p.firstBloodAssist ? 100 : 0,
+            goldPerMin: p.goldEarned / durationMin,
+            csPerMin:
+              (p.totalMinionsKilled + p.neutralMinionsKilled) / durationMin,
+            goldLead,
+            dmgPerMin: p.totalDamageDealtToChampions / durationMin,
+            dmgToBuildings: p.damageDealtToBuildings ?? 0,
+            dmgLead,
+            teamDamagePercent: teamDmgPct,
+            maxGameGoldPerMin: maxGPM,
+            teamPosition: p.teamPosition,
+          });
+          const cirEntry: MatchRecord = {
+            category: "Top CIR",
+            value: cirResult.score,
+            ...base,
+            teamPosition: p.teamPosition,
+            cirBreakdown: cirResult.breakdown,
+            cirStats: {
+              killParticipation: kp,
+              visionPerMin: (p.visionScore ?? 0) / durationMin,
+              dmgToObjectives: p.damageDealtToObjectives ?? 0,
+              firstBloodParticipation:
+                p.firstBloodKill || p.firstBloodAssist ? 100 : 0,
+              goldPerMin: p.goldEarned / durationMin,
+              csPerMin:
+                (p.totalMinionsKilled + p.neutralMinionsKilled) / durationMin,
+              goldLead,
+              dmgPerMin: p.totalDamageDealtToChampions / durationMin,
+              dmgToBuildings: p.damageDealtToBuildings ?? 0,
+              dmgLead,
+              teamDamagePercent: teamDmgPct,
+              maxGameGoldPerMin: maxGPM,
+            },
+          };
+          cirAll.push(cirEntry);
+        }
       }
     }
 
-    return Object.values(best);
+    // Merge: existing single-best records + top 15 + worst 10 (overall + per position)
+    cirAll.sort((a, b) => b.value - a.value);
+    const cirOverall = cirAll.slice(0, 15);
+    const positions = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
+    const cirByPos: MatchRecord[] = positions.flatMap((pos) =>
+      cirAll
+        .filter((r) => r.teamPosition === pos)
+        .slice(0, 15)
+        .map((r) => ({ ...r, category: `Top CIR ${pos}` })),
+    );
+
+    // Worst 10 — ascending sort, take bottom 10
+    const cirWorstAll = [...cirAll]
+      .reverse()
+      .slice(0, 10)
+      .map((r) => ({ ...r, category: "Worst CIR" }));
+    const cirWorstByPos: MatchRecord[] = positions.flatMap((pos) =>
+      cirAll
+        .filter((r) => r.teamPosition === pos)
+        .slice(-10)
+        .reverse()
+        .map((r) => ({ ...r, category: `Worst CIR ${pos}` })),
+    );
+
+    return [
+      ...Object.values(best),
+      ...cirOverall,
+      ...cirByPos,
+      ...cirWorstAll,
+      ...cirWorstByPos,
+    ];
   },
   ["match-records"],
   { tags: [DB_TAG], revalidate: 900 },
@@ -676,6 +838,149 @@ export async function getMatchRecords(
   puuids: string[],
 ): Promise<MatchRecord[]> {
   return _getMatchRecords(puuids);
+}
+
+// ─── CIR role averages ───
+
+export interface CirRoleEntry {
+  gameName: string;
+  puuid: string;
+  position: string;
+  avgCir: number;
+  games: number;
+}
+
+const _getCirRoleAverages = unstable_cache(
+  async (puuids: string[]): Promise<CirRoleEntry[]> => {
+    await ensureSchema();
+    const db = getDb();
+    const { SEASON_START_EPOCH, QUEUE_FLEX } =
+      await import("../data/constants");
+    const { computeCIR_v3 } = await import("../lib/cir");
+
+    // gameName+position → { sum, count }
+    const acc = new Map<
+      string,
+      { gameName: string; puuid: string; sum: number; count: number }
+    >();
+
+    for (const puuid of puuids) {
+      const res = await db.execute({
+        sql: `SELECT m.match_id, m.data, pm.played_at FROM matches m
+              JOIN player_matches pm ON pm.match_id = m.match_id
+              WHERE pm.puuid = ?
+              ORDER BY pm.played_at DESC`,
+        args: [puuid],
+      });
+
+      for (const row of res.rows) {
+        const match = JSON.parse(row.data as string) as {
+          metadata: { matchId: string };
+          info: {
+            gameDuration: number;
+            gameStartTimestamp: number;
+            queueId: number;
+            participants: {
+              puuid: string;
+              riotIdGameName?: string;
+              championName: string;
+              win: boolean;
+              kills: number;
+              deaths: number;
+              assists: number;
+              totalDamageDealtToChampions: number;
+              goldEarned: number;
+              totalMinionsKilled: number;
+              neutralMinionsKilled: number;
+              teamPosition: string;
+              teamId: number;
+              visionScore?: number;
+              damageDealtToObjectives?: number;
+              damageDealtToBuildings?: number;
+              firstBloodKill?: boolean;
+              firstBloodAssist?: boolean;
+            }[];
+          };
+        };
+
+        if (match.info.gameStartTimestamp < SEASON_START_EPOCH) continue;
+        if (match.info.queueId !== QUEUE_FLEX) continue;
+        if (match.info.gameDuration < 600) continue;
+
+        const p = match.info.participants.find((pt) => pt.puuid === puuid);
+        if (!p || !p.teamPosition) continue;
+
+        const durationMin = match.info.gameDuration / 60;
+        if (durationMin <= 0) continue;
+
+        const gameName = p.riotIdGameName ?? puuid;
+        const teamKills = match.info.participants
+          .filter((tp) => tp.teamId === p.teamId)
+          .reduce((s, tp) => s + tp.kills, 0);
+        const kp =
+          teamKills > 0 ? ((p.kills + p.assists) / teamKills) * 100 : 0;
+        const opponent = match.info.participants.find(
+          (op) => op.teamId !== p.teamId && op.teamPosition === p.teamPosition,
+        );
+        const goldLead = opponent ? p.goldEarned - opponent.goldEarned : 0;
+        const dmgLead = opponent
+          ? p.totalDamageDealtToChampions - opponent.totalDamageDealtToChampions
+          : 0;
+        const teamTotalDmg = match.info.participants
+          .filter((tp) => tp.teamId === p.teamId)
+          .reduce((s, tp) => s + tp.totalDamageDealtToChampions, 0);
+        const teamDmgPct =
+          teamTotalDmg > 0
+            ? (p.totalDamageDealtToChampions / teamTotalDmg) * 100
+            : 0;
+        const maxGPM = Math.max(
+          ...match.info.participants.map((pt) => pt.goldEarned / durationMin),
+        );
+
+        const cirResult = computeCIR_v3({
+          kills: p.kills,
+          deaths: p.deaths,
+          assists: p.assists,
+          killParticipation: kp,
+          visionPerMin: (p.visionScore ?? 0) / durationMin,
+          dmgToObjectives: p.damageDealtToObjectives ?? 0,
+          firstBloodParticipation:
+            p.firstBloodKill || p.firstBloodAssist ? 100 : 0,
+          goldPerMin: p.goldEarned / durationMin,
+          csPerMin:
+            (p.totalMinionsKilled + p.neutralMinionsKilled) / durationMin,
+          goldLead,
+          dmgPerMin: p.totalDamageDealtToChampions / durationMin,
+          dmgToBuildings: p.damageDealtToBuildings ?? 0,
+          dmgLead,
+          teamDamagePercent: teamDmgPct,
+          maxGameGoldPerMin: maxGPM,
+          teamPosition: p.teamPosition,
+        });
+
+        const key = `${puuid}::${p.teamPosition}`;
+        const entry = acc.get(key) ?? { gameName, puuid, sum: 0, count: 0 };
+        entry.sum += cirResult.score;
+        entry.count += 1;
+        acc.set(key, entry);
+      }
+    }
+
+    return Array.from(acc.entries()).map(
+      ([key, { gameName, puuid, sum, count }]) => {
+        const position = key.split("::")[1];
+        return { gameName, puuid, position, avgCir: sum / count, games: count };
+      },
+    );
+  },
+  ["cir-role-averages"],
+  { tags: [DB_TAG], revalidate: 900 },
+);
+
+export async function getCirRoleAverages(
+  puuids: string[],
+): Promise<CirRoleEntry[]> {
+  return _getCirRoleAverages(puuids);
 }
 
 // ─── DB stats ───

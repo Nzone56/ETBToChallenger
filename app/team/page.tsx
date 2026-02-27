@@ -4,7 +4,9 @@ import {
   getAllRankedSnapshots,
   getAllPlayerStats,
   getGroupMatchCount,
+  getGroupMatchWins,
   getLatestSyncedAt,
+  getCirRoleAverages,
   type RankedSnapshot,
 } from "@/app/lib/db";
 import { EMPTY_STATS } from "@/app/lib/helpers";
@@ -12,20 +14,31 @@ import type { Summoner, PlayerAggregatedStats } from "@/app/types/riot";
 import TeamOverview from "@/app/components/team/TeamOverview";
 import InternalRankings from "@/app/components/team/InternalRankings";
 import FinalRankings from "@/app/components/team/FinalRankings";
+import BestRoster from "@/app/components/team/BestRoster";
 import GroupMatchHistory from "@/app/components/team/GroupMatchHistory";
 import SyncTrigger from "@/app/components/SyncTrigger";
 
 export const revalidate = 900;
 
 export default async function TeamPage() {
-  const [snapshots, statsRows, groupMatchCount, version, syncedAt] =
-    await Promise.all([
-      getAllRankedSnapshots(),
-      getAllPlayerStats(),
-      getGroupMatchCount(),
-      getDdragonVersion(),
-      getLatestSyncedAt(),
-    ]);
+  const puuids = users.map((u) => u.puuid);
+  const [
+    snapshots,
+    statsRows,
+    groupMatchCount,
+    groupWins,
+    cirRoleAverages,
+    version,
+    syncedAt,
+  ] = await Promise.all([
+    getAllRankedSnapshots(),
+    getAllPlayerStats(),
+    getGroupMatchCount(),
+    getGroupMatchWins(),
+    getCirRoleAverages(puuids),
+    getDdragonVersion(),
+    getLatestSyncedAt(),
+  ]);
 
   const snapshotMap = new Map(
     (snapshots as RankedSnapshot[]).map((s) => [s.puuid, s]),
@@ -53,8 +66,6 @@ export default async function TeamPage() {
     };
   });
 
-  const groupWins = 0; // computed client-side in GroupMatchHistory
-
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <SyncTrigger dbEmpty={dbEmpty} syncedAt={syncedAt} />
@@ -74,6 +85,16 @@ export default async function TeamPage() {
           players={playerStatsData}
           totalGroupMatches={groupMatchCount}
           groupWins={groupWins}
+          version={version}
+        />
+
+        {/* Best Roster — highest avg CIR per role */}
+        <BestRoster
+          entries={cirRoleAverages}
+          players={playerStatsData.map((p) => ({
+            gameName: p.gameName,
+            profileIconId: p.profileIconId,
+          }))}
           version={version}
         />
 

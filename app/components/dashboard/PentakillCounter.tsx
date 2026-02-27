@@ -49,7 +49,7 @@ export default function PentakillCounter({
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {events.map((e) => {
           const name = playerNames[e.puuid] ?? e.gameName;
-          const date = new Date(e.playedAt).toLocaleDateString(undefined, {
+          const date = new Date(e.playedAt).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
             year: "numeric",

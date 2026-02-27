@@ -4,6 +4,7 @@ import {
   getAllPlayerStats,
   getLastMatchByPuuid,
   getLatestSyncedAt,
+  getCirRoleAverages,
 } from "./lib/db";
 import {
   computeAverageElo,
@@ -25,20 +26,29 @@ import Leaderboard from "./components/dashboard/Leaderboard";
 import PlayerCard from "./components/dashboard/PlayerCard";
 import BestOfSection from "./components/dashboard/BestOfSection";
 import RoleLeaderboard from "./components/dashboard/RoleLeaderboard";
+import RoleCirLeaderboard from "./components/dashboard/RoleCirLeaderboard";
 import SyncTrigger from "./components/SyncTrigger";
 
 // Revalidate every 15 minutes — unstable_cache prevents redundant DB reads
 export const revalidate = 900;
 
 export default async function Home() {
-  const [snapshots, statsRows, lastMatches, version, syncedAt] =
-    await Promise.all([
-      getAllRankedSnapshots(),
-      getAllPlayerStats(),
-      Promise.all(users.map((u) => getLastMatchByPuuid(u.puuid))),
-      getDdragonVersion(),
-      getLatestSyncedAt(),
-    ]);
+  const puuids = users.map((u) => u.puuid);
+  const [
+    snapshots,
+    statsRows,
+    lastMatches,
+    cirRoleAverages,
+    version,
+    syncedAt,
+  ] = await Promise.all([
+    getAllRankedSnapshots(),
+    getAllPlayerStats(),
+    Promise.all(users.map((u) => getLastMatchByPuuid(u.puuid))),
+    getCirRoleAverages(puuids),
+    getDdragonVersion(),
+    getLatestSyncedAt(),
+  ]);
 
   const snapshotMap = new Map(snapshots.map((s) => [s.puuid, s]));
   const statsMap = new Map(statsRows.map((r) => [r.puuid, r]));
@@ -145,6 +155,14 @@ export default async function Home() {
               <div className="lg:col-span-1 space-y-4">
                 <Leaderboard players={dashboardData} version={version} />
                 <RoleLeaderboard players={playerStatsData} version={version} />
+                <RoleCirLeaderboard
+                  entries={cirRoleAverages}
+                  players={playerStatsData.map((p) => ({
+                    gameName: p.gameName,
+                    profileIconId: p.profileIconId,
+                  }))}
+                  version={version}
+                />
               </div>
               <div className="lg:col-span-2">
                 <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-400">

@@ -1,16 +1,26 @@
+"use client";
+
+import { useState } from "react";
 import type { MatchRecord } from "@/app/lib/db";
 import type { PentakillEvent } from "@/app/lib/db";
-import ChampionIcon from "@/app/components/ui/ChampionIcon";
 import {
-  Swords,
   Skull,
-  Handshake,
-  Zap,
-  Coins,
-  TrendingUp,
   Star,
   Trophy,
+  Activity,
+  TrendingDown,
+  Crown,
 } from "lucide-react";
+import CirLeaderboardCard from "./CirLeaderboardCard";
+import PentakillCard from "./PentakillCard";
+import RecordCard from "./RecordCard";
+import {
+  BEST_ORDER,
+  CIR_TABS,
+  WORST_CIR_TABS,
+  WORST_ORDER,
+  cirLabel,
+} from "./RecordData";
 
 interface RecordsGridProps {
   records: MatchRecord[];
@@ -18,228 +28,41 @@ interface RecordsGridProps {
   version: string;
 }
 
-const CATEGORY_META: Record<
-  string,
-  {
-    icon: React.ReactNode;
-    color: string;
-    border: string;
-    format: (v: number) => string;
-    subtitle: (r: MatchRecord) => string;
-  }
-> = {
-  "Most Kills": {
-    icon: <Swords className="h-4 w-4 text-red-400" />,
-    color: "text-red-300",
-    border: "border-red-800/30",
-    format: (v) => String(Math.round(v)),
-    subtitle: (r) => `${r.kills} / ${r.deaths} / ${r.assists}`,
-  },
-  "Most Deaths": {
-    icon: <Skull className="h-4 w-4 text-zinc-400" />,
-    color: "text-zinc-300",
-    border: "border-zinc-700/40",
-    format: (v) => String(Math.round(v)),
-    subtitle: (r) => `${r.kills} / ${r.deaths} / ${r.assists}`,
-  },
-  "Most Assists": {
-    icon: <Handshake className="h-4 w-4 text-sky-400" />,
-    color: "text-sky-300",
-    border: "border-sky-800/30",
-    format: (v) => String(Math.round(v)),
-    subtitle: (r) => `${r.kills} / ${r.deaths} / ${r.assists}`,
-  },
-  "Highest DMG/min": {
-    icon: <Zap className="h-4 w-4 text-orange-400" />,
-    color: "text-orange-300",
-    border: "border-orange-800/30",
-    format: (v) => `${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game`,
-  },
-  "Highest Gold/min": {
-    icon: <Coins className="h-4 w-4 text-yellow-400" />,
-    color: "text-yellow-300",
-    border: "border-yellow-800/30",
-    format: (v) => `${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game`,
-  },
-  "Highest CS/min": {
-    icon: <TrendingUp className="h-4 w-4 text-emerald-400" />,
-    color: "text-emerald-300",
-    border: "border-emerald-800/30",
-    format: (v) => v.toFixed(2),
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game`,
-  },
-  "Highest Gold Lead": {
-    icon: <Coins className="h-4 w-4 text-amber-400" />,
-    color: "text-amber-300",
-    border: "border-amber-800/30",
-    format: (v) => `${v >= 0 ? "+" : ""}${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game`,
-  },
-  "Highest DMG Lead": {
-    icon: <Zap className="h-4 w-4 text-fuchsia-400" />,
-    color: "text-fuchsia-300",
-    border: "border-fuchsia-800/30",
-    format: (v) => `${v >= 0 ? "+" : ""}${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game`,
-  },
-  "Lowest DMG/min": {
-    icon: <Zap className="h-4 w-4 text-red-600" />,
-    color: "text-red-400",
-    border: "border-red-900/30",
-    format: (v) => `${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game · excl. supp`,
-  },
-  "Lowest Gold/min": {
-    icon: <Coins className="h-4 w-4 text-zinc-500" />,
-    color: "text-zinc-400",
-    border: "border-zinc-700/30",
-    format: (v) => `${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game · excl. supp`,
-  },
-  "Lowest CS/min": {
-    icon: <TrendingUp className="h-4 w-4 text-zinc-500" />,
-    color: "text-zinc-400",
-    border: "border-zinc-700/30",
-    format: (v) => v.toFixed(2),
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game · excl. supp`,
-  },
-  "Lowest Gold Lead": {
-    icon: <Coins className="h-4 w-4 text-red-600" />,
-    color: "text-red-400",
-    border: "border-red-900/30",
-    format: (v) => `${v >= 0 ? "+" : ""}${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game · excl. supp`,
-  },
-  "Lowest DMG Lead": {
-    icon: <Zap className="h-4 w-4 text-red-600" />,
-    color: "text-red-400",
-    border: "border-red-900/30",
-    format: (v) => `${v >= 0 ? "+" : ""}${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game · excl. supp`,
-  },
-};
-
-const BEST_ORDER = [
-  "Most Kills",
-  "Most Assists",
-  "Highest DMG/min",
-  "Highest Gold/min",
-  "Highest CS/min",
-  "Highest Gold Lead",
-  "Highest DMG Lead",
-];
-
-const WORST_ORDER = [
-  "Most Deaths",
-  "Lowest DMG/min",
-  "Lowest Gold/min",
-  "Lowest CS/min",
-  "Lowest Gold Lead",
-  "Lowest DMG Lead",
-];
-
-function RecordCard({
-  record,
-  version,
+function TabBar({
+  tabs,
+  active,
+  byCategory,
+  onSelect,
+  activeColor,
 }: {
-  record: MatchRecord;
-  version: string;
+  tabs: readonly { key: string; label: string }[];
+  active: string;
+  byCategory: Map<string, MatchRecord[]>;
+  onSelect: (key: string) => void;
+  activeColor: string;
 }) {
-  const meta = CATEGORY_META[record.category];
-  const date = new Date(record.playedAt).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-
   return (
-    <div
-      className={`flex items-center gap-3 rounded-xl border ${meta.border} bg-zinc-900/50 px-4 py-3 backdrop-blur-sm`}
-    >
-      <ChampionIcon
-        championName={record.championName}
-        version={version}
-        size={44}
-        className="shrink-0 rounded-lg"
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          {meta.icon}
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-            {record.category}
-          </span>
-        </div>
-        <div className={`text-xl font-bold tabular-nums ${meta.color}`}>
-          {meta.format(record.value)}
-        </div>
-        <div className="text-xs text-zinc-400 truncate">
-          {meta.subtitle(record)}
-        </div>
-      </div>
-      <div className="shrink-0 text-right">
-        <div className="text-sm font-semibold text-zinc-200 truncate max-w-20">
-          {record.gameName}
-        </div>
-        <div className="text-xs text-zinc-500 truncate max-w-20">
-          {record.championName}
-        </div>
-        <div className="text-[10px] text-zinc-600">{date}</div>
-        <div
-          className={`mt-0.5 text-[10px] font-semibold ${record.win ? "text-emerald-400" : "text-red-400"}`}
-        >
-          {record.win ? "WIN" : "LOSS"}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PentakillCard({
-  event,
-  version,
-}: {
-  event: PentakillEvent;
-  version: string;
-}) {
-  const date = new Date(event.playedAt).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-indigo-800/30 bg-indigo-950/20 px-4 py-3 backdrop-blur-sm">
-      <ChampionIcon
-        championName={event.championName}
-        version={version}
-        size={44}
-        className="shrink-0 rounded-lg"
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <Star className="h-4 w-4 text-indigo-400" />
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-            Pentakill
-          </span>
-          {event.pentaKills > 1 && (
-            <span className="rounded bg-indigo-500/20 px-1 py-0.5 text-[10px] font-bold text-indigo-300">
-              ×{event.pentaKills}
-            </span>
-          )}
-        </div>
-        <div className="text-xl font-bold text-indigo-300">PENTA</div>
-        <div className="text-xs text-zinc-400 truncate">
-          {event.championName}
-        </div>
-      </div>
-      <div className="shrink-0 text-right">
-        <div className="text-sm font-semibold text-zinc-200 truncate max-w-20">
-          {event.gameName}
-        </div>
-        <div className="text-[10px] text-zinc-600">{date}</div>
-      </div>
+    <div className="mb-4 flex flex-wrap gap-1">
+      {tabs.map((tab) => {
+        const count = byCategory.get(tab.key)?.length ?? 0;
+        const isActive = active === tab.key;
+        return (
+          <button
+            key={tab.key}
+            onClick={() => onSelect(tab.key)}
+            disabled={count === 0}
+            className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              isActive
+                ? `${activeColor} border`
+                : count === 0
+                  ? "cursor-not-allowed text-zinc-700"
+                  : "border border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
+            }`}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -249,68 +72,318 @@ export default function RecordsGrid({
   pentakills,
   version,
 }: RecordsGridProps) {
+  const [pageTab, setPageTab] = useState<"records" | "cir">("records");
+  const [cirTab, setCirTab] = useState<string>("Top CIR");
+  const [worstTab, setWorstTab] = useState<string>("Worst CIR");
+
   const recordMap = new Map(records.map((r) => [r.category, r]));
 
+  // ── Build Top CIR category map ──
+  const cirByCategory = new Map<string, MatchRecord[]>();
+  for (const r of records) {
+    if (!r.category.startsWith("Top CIR")) continue;
+    const list = cirByCategory.get(r.category) ?? [];
+    list.push(r);
+    cirByCategory.set(r.category, list);
+  }
+  for (const list of cirByCategory.values())
+    list.sort((a, b) => b.value - a.value);
+
+  // ── Build Worst CIR category map ──
+  const worstByCategory = new Map<string, MatchRecord[]>();
+  for (const r of records) {
+    if (!r.category.startsWith("Worst CIR")) continue;
+    const list = worstByCategory.get(r.category) ?? [];
+    list.push(r);
+    worstByCategory.set(r.category, list);
+  }
+  // Worst = ascending (lowest score first)
+  for (const list of worstByCategory.values())
+    list.sort((a, b) => a.value - b.value);
+
+  const hasCir = CIR_TABS.some(
+    (t) => (cirByCategory.get(t.key)?.length ?? 0) > 0,
+  );
+  const hasWorst = WORST_CIR_TABS.some(
+    (t) => (worstByCategory.get(t.key)?.length ?? 0) > 0,
+  );
+
+  const activeCirList = cirByCategory.get(cirTab) ?? [];
+  const activeWorstList = worstByCategory.get(worstTab) ?? [];
+
+  // ── Player stats: appearances in per-role top-15 + legendary count ──
+  // Count appearances across all ROLE tabs only (exclude Overall)
+  const ROLE_KEYS = [
+    "Top CIR TOP",
+    "Top CIR JUNGLE",
+    "Top CIR MIDDLE",
+    "Top CIR BOTTOM",
+    "Top CIR UTILITY",
+  ];
+  const appearancesMap = new Map<string, number>();
+  const legendaryMap = new Map<string, number>();
+  for (const key of ROLE_KEYS) {
+    const list = cirByCategory.get(key) ?? [];
+    for (const r of list) {
+      appearancesMap.set(r.gameName, (appearancesMap.get(r.gameName) ?? 0) + 1);
+      if (r.value >= 20) {
+        legendaryMap.set(r.gameName, (legendaryMap.get(r.gameName) ?? 0) + 1);
+      }
+    }
+  }
+  const appearanceRanking = [...appearancesMap.entries()].sort(
+    (a, b) => b[1] - a[1],
+  );
+  const legendaryRanking = [...legendaryMap.entries()].sort(
+    (a, b) => b[1] - a[1],
+  );
+
+  const hasPlayerStats = appearanceRanking.length > 0;
+
   return (
-    <div className="space-y-10">
-      {/* Best Records */}
-      <section>
-        <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-          <Trophy className="h-4 w-4 text-yellow-400" />
-          Best Individual Performances
-        </h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {BEST_ORDER.map((cat) => {
-            const record = recordMap.get(cat);
-            if (!record) return null;
-            return <RecordCard key={cat} record={record} version={version} />;
-          })}
-        </div>
-      </section>
+    <div className="space-y-6">
+      {/* ── Page-level tab switcher ── */}
+      <div className="flex gap-2 border-b border-zinc-800 pb-1">
+        <button
+          onClick={() => setPageTab("records")}
+          className={`cursor-pointer flex items-center gap-1.5 px-4 py-2 text-sm font-semibold transition-colors rounded-t-lg ${
+            pageTab === "records"
+              ? "border-b-2 border-yellow-400 text-yellow-300"
+              : "text-zinc-500 hover:text-zinc-300"
+          }`}
+        >
+          <Trophy className="h-4 w-4" />
+          Records
+        </button>
+        <button
+          onClick={() => setPageTab("cir")}
+          className={`cursor-pointer flex items-center gap-1.5 px-4 py-2 text-sm font-semibold transition-colors rounded-t-lg ${
+            pageTab === "cir"
+              ? "border-b-2 border-amber-400 text-amber-300"
+              : "text-zinc-500 hover:text-zinc-300"
+          }`}
+        >
+          <Activity className="h-4 w-4" />
+          CIR
+        </button>
+      </div>
 
-      {/* Worst Records */}
-      <section>
-        <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-          <Skull className="h-4 w-4 text-red-500" />
-          Worst Individual Performances
-          <span className="text-xs font-normal text-zinc-600">
-            (excl. support for farm/gold/dmg)
-          </span>
-        </h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {WORST_ORDER.map((cat) => {
-            const record = recordMap.get(cat);
-            if (!record) return null;
-            return <RecordCard key={cat} record={record} version={version} />;
-          })}
-        </div>
-      </section>
+      {/* ── RECORDS TAB ── */}
+      {pageTab === "records" && (
+        <div className="space-y-10">
+          <section>
+            <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
+              <Trophy className="h-4 w-4 text-yellow-400" />
+              Records
+            </h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 stagger-grid">
+              {BEST_ORDER.map((cat) => {
+                const record = recordMap.get(cat);
+                if (!record) return null;
+                return (
+                  <RecordCard key={cat} record={record} version={version} />
+                );
+              })}
+            </div>
+          </section>
 
-      {/* Pentakill Counter */}
-      <section>
-        <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-          <Star className="h-4 w-4 text-indigo-400" />
-          Pentakill Counter
-          <span className="text-xs font-normal text-zinc-600">
-            ({pentakills.reduce((s, e) => s + e.pentaKills, 0)} total)
-          </span>
-        </h2>
-        {pentakills.length === 0 ? (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 text-center text-sm text-zinc-500">
-            No pentakills yet — go get one!
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {pentakills.map((e) => (
-              <PentakillCard
-                key={e.matchId + e.puuid}
-                event={e}
-                version={version}
+          <section>
+            <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
+              <Skull className="h-4 w-4 text-red-500" />
+              {"Records'nt"}
+              <span className="text-xs font-normal text-zinc-600">
+                (excl. support for farm/gold/dmg)
+              </span>
+            </h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 stagger-grid">
+              {WORST_ORDER.map((cat) => {
+                const record = recordMap.get(cat);
+                if (!record) return null;
+                return (
+                  <RecordCard key={cat} record={record} version={version} />
+                );
+              })}
+            </div>
+          </section>
+
+          <section>
+            <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
+              <Star className="h-4 w-4 text-indigo-400" />
+              Pentakill Counter
+              <span className="text-xs font-normal text-zinc-600">
+                ({pentakills.reduce((s, e) => s + e.pentaKills, 0)} total)
+              </span>
+            </h2>
+            {pentakills.length === 0 ? (
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 text-center text-sm text-zinc-500">
+                No pentakills yet — go get one!
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {pentakills.map((e) => (
+                  <PentakillCard
+                    key={e.matchId + e.puuid}
+                    event={e}
+                    version={version}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {/* ── CIR TAB ── */}
+      {pageTab === "cir" && (
+        <div className="space-y-10">
+          {hasPlayerStats && (
+            <section>
+              <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
+                <Crown className="h-4 w-4 text-violet-400" />
+                CIR Player Rankings
+              </h2>
+              <p className="mb-4 text-xs text-zinc-600">
+                Counted across per-role top-15 leaderboards only (not Overall
+                tab)
+              </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 stagger-grid">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    Top-15 Appearances
+                  </p>
+                  <div className="space-y-2">
+                    {appearanceRanking.map(([name, count], i) => (
+                      <div key={name} className="flex items-center gap-2">
+                        <span
+                          className={`w-5 text-center text-xs font-bold tabular-nums ${i === 0 ? "text-yellow-400" : i === 1 ? "text-zinc-300" : i === 2 ? "text-amber-600" : "text-zinc-600"}`}
+                        >
+                          {i + 1}
+                        </span>
+                        <span className="flex-1 truncate text-sm font-medium text-zinc-200">
+                          {name}
+                        </span>
+                        <span className="tabular-nums text-sm font-bold text-violet-400">
+                          {count}
+                        </span>
+                        <span className="text-xs text-zinc-600">entries</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    Legendary Performances{" "}
+                    <span className="text-yellow-400/60">(≥20 CIR)</span>
+                  </p>
+                  {legendaryRanking.length === 0 ? (
+                    <p className="text-xs text-zinc-600 italic">
+                      No legendary performances yet
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {legendaryRanking.map(([name, count], i) => {
+                        const { color } = cirLabel(20);
+                        return (
+                          <div key={name} className="flex items-center gap-2">
+                            <span
+                              className={`w-5 text-center text-xs font-bold tabular-nums ${i === 0 ? "text-yellow-400" : i === 1 ? "text-zinc-300" : i === 2 ? "text-amber-600" : "text-zinc-600"}`}
+                            >
+                              {i + 1}
+                            </span>
+                            <span className="flex-1 truncate text-sm font-medium text-zinc-200">
+                              {name}
+                            </span>
+                            <span
+                              className={`tabular-nums text-sm font-bold ${color}`}
+                            >
+                              {count}
+                            </span>
+                            <span className="text-xs text-zinc-600">
+                              × Legendary
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {hasCir && (
+            <section>
+              <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
+                <Activity className="h-4 w-4 text-amber-400" />
+                Top 15 Performances — CIR
+              </h2>
+              <p className="mb-3 text-xs text-zinc-600">
+                Competitive Impact Rating · combat, utility, economy &amp;
+                pressure · role-weighted
+              </p>
+              <TabBar
+                tabs={CIR_TABS}
+                active={cirTab}
+                byCategory={cirByCategory}
+                onSelect={setCirTab}
+                activeColor="bg-amber-500/20 text-amber-300 border-amber-500/40"
               />
-            ))}
-          </div>
-        )}
-      </section>
+              <div className="flex flex-col gap-2 stagger-grid">
+                {activeCirList.length === 0 ? (
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 text-center text-sm text-zinc-500">
+                    No data for this role yet
+                  </div>
+                ) : (
+                  activeCirList.map((record, i) => (
+                    <CirLeaderboardCard
+                      key={record.matchId + record.puuid + i}
+                      record={record}
+                      rank={i + 1}
+                      version={version}
+                    />
+                  ))
+                )}
+              </div>
+            </section>
+          )}
+
+          {hasWorst && (
+            <section>
+              <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
+                <TrendingDown className="h-4 w-4 text-red-400" />
+                Worst 10 Performances — CIR
+              </h2>
+              <p className="mb-3 text-xs text-zinc-600">
+                Lowest Competitive Impact Rating scores · role-weighted
+              </p>
+              <TabBar
+                tabs={WORST_CIR_TABS}
+                active={worstTab}
+                byCategory={worstByCategory}
+                onSelect={setWorstTab}
+                activeColor="bg-red-500/20 text-red-300 border-red-500/40"
+              />
+              <div className="flex flex-col gap-2 stagger-grid">
+                {activeWorstList.length === 0 ? (
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 text-center text-sm text-zinc-500">
+                    No data for this role yet
+                  </div>
+                ) : (
+                  activeWorstList.map((record, i) => (
+                    <CirLeaderboardCard
+                      key={record.matchId + record.puuid + i}
+                      record={record}
+                      rank={i + 1}
+                      version={version}
+                    />
+                  ))
+                )}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
     </div>
   );
 }

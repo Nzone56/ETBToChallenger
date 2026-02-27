@@ -197,6 +197,7 @@ export interface PlayerAggregatedStats {
   avgGoldLead: number;
   avgDmgLead: number;
   goldLeadGames: number;
+  avgCir: number;
   championStats: ChampionStats[];
   roleStats: RoleStats[];
   primaryRole: Position | null;
@@ -226,7 +227,8 @@ export type StatCategory =
   | "dmgToBuildings"
   | "dmgToObjectives"
   | "goldLead"
-  | "dmgLead";
+  | "dmgLead"
+  | "cirAvg";
 
 export interface BestOfChallenge {
   best: Record<StatCategory, RankedEntry[]>;

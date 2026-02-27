@@ -317,8 +317,26 @@ describe("aggregatePlayerStats", () => {
       expect(r.avgDmgLead).toBeCloseTo(15_000, 5);
     });
 
-    it("skips gold/dmg lead when no lane opponent found", () => {
-      // Player is JUNGLE, no enemy JUNGLE in participants
+    it("counts jungle lead when enemy jungler exists", () => {
+      const match = makeMatch(1800, {
+        teamPosition: "JUNGLE",
+        goldEarned: 14_000,
+      });
+      match.info.participants.push(
+        makeParticipant({
+          puuid: ENEMY_PUUID,
+          teamId: 200,
+          teamPosition: "JUNGLE",
+          goldEarned: 11_000,
+        }),
+      );
+      const r = aggregatePlayerStats(PUUID, [match]);
+      expect(r.goldLeadGames).toBe(1);
+      expect(r.avgGoldLead).toBeCloseTo(3000, 5);
+    });
+
+    it("skips gold/dmg lead when no matching opponent found in data", () => {
+      // Simulate corrupt/incomplete data: teamPosition set but no enemy with same position
       const match = makeMatch(1800, { teamPosition: "JUNGLE" });
       const r = aggregatePlayerStats(PUUID, [match]);
       expect(r.goldLeadGames).toBe(0);
