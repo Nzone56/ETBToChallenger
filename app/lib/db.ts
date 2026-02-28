@@ -158,6 +158,21 @@ export async function getLastMatchByPuuid(
   return _getLastMatchByPuuid(puuid);
 }
 
+// React cache() for request-level deduplication (similar to getMatchesByPuuid)
+// Match data is static once stored, so this is safe
+export const getMatchById = cache(
+  async (matchId: string): Promise<object | null> => {
+    await ensureSchema();
+    const db = getDb();
+    const res = await db.execute({
+      sql: "SELECT data FROM matches WHERE match_id = ?",
+      args: [matchId],
+    });
+    const row = res.rows[0];
+    return row ? JSON.parse(row.data as string) : null;
+  },
+);
+
 export interface PentakillEvent {
   gameName: string;
   puuid: string;

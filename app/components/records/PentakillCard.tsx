@@ -1,6 +1,7 @@
 import { PentakillEvent } from "@/app/lib/db";
 import ChampionIcon from "../ui/ChampionIcon";
 import { Star } from "lucide-react";
+import Link from "next/link";
 
 function PentakillCard({
   event,
@@ -16,7 +17,10 @@ function PentakillCard({
   });
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-indigo-800/30 bg-indigo-950/20 px-4 py-3 backdrop-blur-sm">
+    <Link
+      href={`/match/${event.matchId}`}
+      className="flex items-center gap-3 rounded-xl border border-indigo-800/30 bg-indigo-950/20 px-4 py-3 backdrop-blur-sm hover:bg-indigo-950/30 transition-colors cursor-pointer"
+    >
       <ChampionIcon
         championName={event.championName}
         version={version}
@@ -46,7 +50,7 @@ function PentakillCard({
         </div>
         <div className="text-[10px] text-zinc-600">{date}</div>
       </div>
-    </div>
+    </Link>
   );
 }
 

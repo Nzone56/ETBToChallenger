@@ -1,6 +1,7 @@
 import { MatchRecord } from "@/app/lib/db";
 import { Swords, Skull, Handshake, Zap, Coins, TrendingUp } from "lucide-react";
 import ChampionIcon from "../ui/ChampionIcon";
+import Link from "next/link";
 
 const CATEGORY_META: Record<
   string,
@@ -120,8 +121,9 @@ function RecordCard({
   });
 
   return (
-    <div
-      className={`flex items-center gap-3 rounded-xl border ${meta.border} bg-zinc-900/50 px-4 py-3 backdrop-blur-sm`}
+    <Link
+      href={`/match/${record.matchId}`}
+      className={`flex items-center gap-3 rounded-xl border ${meta.border} bg-zinc-900/50 px-4 py-3 backdrop-blur-sm transition-all hover:bg-zinc-900/70 hover:border-opacity-60 cursor-pointer`}
     >
       <ChampionIcon
         championName={record.championName}
@@ -157,7 +159,7 @@ function RecordCard({
           {record.win ? "WIN" : "LOSS"}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 export default RecordCard;
