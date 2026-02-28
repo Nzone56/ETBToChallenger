@@ -6,12 +6,14 @@ import {
 } from "@/app/lib/db";
 import { getUserByRiotId } from "@/app/data/users";
 import { notFound } from "next/navigation";
-import PlayerHeader from "@/app/components/player/PlayerHeader";
-import AggregatedStats from "@/app/components/player/AggregatedStats";
-import RolePerformance from "@/app/components/player/RolePerformance";
-import ChampionStatsTable from "@/app/components/player/ChampionStatsTable";
+import PlayerHero from "@/app/components/player/PlayerHero";
+import PlayerStatsGrid from "@/app/components/player/PlayerStatsGrid";
+import RoleSpecialization from "@/app/components/player/RoleSpecialization";
+import ChampionProficiency from "@/app/components/player/ChampionProficiency";
+import PlayerRadarChart from "@/app/components/player/PlayerRadarChart";
 import MatchHistoryList from "@/app/components/player/MatchHistoryList";
 import SyncTrigger from "@/app/components/SyncTrigger";
+import { getChampionSkinUrl } from "@/app/lib/skinUtils";
 import type {
   Summoner,
   LeagueEntry,
@@ -59,38 +61,67 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     flexEntry,
   };
 
+  // Fetch skin URL for most played champion (fire-and-forget, won't block render)
+  const mostPlayedChamp = stats?.championStats?.[0]?.championName ?? null;
+  const skinUrl = mostPlayedChamp
+    ? await getChampionSkinUrl(mostPlayedChamp, version)
+    : null;
+
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <SyncTrigger dbEmpty={dbEmpty} />
-      <div className="space-y-6 stagger-children">
-        {dbEmpty || !stats ? (
-          <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-center">
-            <p className="text-lg font-semibold text-zinc-300">
-              Syncing data for {user.gameName}…
-            </p>
-            <p className="text-sm text-zinc-500">
-              This takes a moment on first load. The page will refresh
-              automatically.
-            </p>
+
+      {dbEmpty || !stats ? (
+        <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-center">
+          <p className="text-lg font-semibold text-zinc-300">
+            Syncing data for {user.gameName}…
+          </p>
+          <p className="text-sm text-zinc-500">
+            This takes a moment on first load. The page will refresh
+            automatically.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6 stagger-children">
+          {/* Hero banner with skin background */}
+          <PlayerHero
+            player={ranked}
+            stats={stats}
+            version={version}
+            skinUrl={skinUrl}
+          />
+
+          {/* Main 2-column layout */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            {/* Left column */}
+            <div className="space-y-6 lg:col-span-1">
+              <RoleSpecialization roleStats={stats.roleStats} />
+              <PlayerRadarChart stats={stats} />
+            </div>
+
+            {/* Right column */}
+            <div className="space-y-6 lg:col-span-2">
+              {/* Top stat cards row */}
+              <PlayerStatsGrid stats={stats} />
+
+              {/* Champion proficiency */}
+              <ChampionProficiency
+                champions={stats.championStats}
+                version={version}
+              />
+            </div>
           </div>
-        ) : (
-          <>
-            <PlayerHeader player={ranked} version={version} />
-            <AggregatedStats stats={stats} />
-            <RolePerformance roleStats={stats.roleStats} />
-            <ChampionStatsTable
-              champions={stats.championStats}
-              version={version}
-            />
-            <MatchHistoryList
-              puuid={user.puuid}
-              initialMatches={typedMatches}
-              version={version}
-              pageSize={10}
-            />
-          </>
-        )}
-      </div>
+
+          {/* Match history — full width */}
+          <MatchHistoryList
+            puuid={user.puuid}
+            initialMatches={typedMatches}
+            version={version}
+            pageSize={10}
+            totalGames={stats.totalGames}
+          />
+        </div>
+      )}
     </main>
   );
 }
