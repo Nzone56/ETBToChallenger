@@ -22,6 +22,16 @@ export function getCirTierLetter(cir: number): string {
   return "P"; // Poor
 }
 
+/** Get CIR tier label (first letter only) */
+export function getCirTierWord(cir: number): string {
+  if (cir >= 20) return "Legendary"; // Legendary
+  if (cir >= 15) return "Dominant"; // Dominant
+  if (cir >= 11) return "Great"; // Great
+  if (cir >= 8) return "Solid"; // Solid
+  if (cir >= 6) return "Average"; // Average
+  return "Poor"; // Poor
+}
+
 /** Get background color class for CIR badge */
 export function getCirBgColor(cir: number): string {
   if (cir >= 20) return "border-yellow-500/30 bg-yellow-500/10";

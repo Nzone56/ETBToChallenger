@@ -14,6 +14,7 @@ import ChampionIcon from "@/app/components/ui/ChampionIcon";
 import KdaDisplay from "@/app/components/ui/KdaDisplay";
 import { cn } from "@/app/lib/utils";
 import { ChevronDown, Loader2, Clock } from "lucide-react";
+import Link from "next/link";
 
 interface MatchHistoryListProps {
   puuid: string;
@@ -141,10 +142,11 @@ export default function MatchHistoryList({
                 : "text-red-400";
 
           return (
-            <div
+            <Link
               key={match.metadata.matchId}
+              href={`/match/${match.metadata.matchId}`}
               className={cn(
-                "flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors",
+                "flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors cursor-pointer",
                 p.win
                   ? "border-emerald-800/40 bg-emerald-950/15 hover:bg-emerald-950/25"
                   : "border-red-800/40 bg-red-950/15 hover:bg-red-950/25",
@@ -231,7 +233,7 @@ export default function MatchHistoryList({
                   {cirTier}
                 </div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>

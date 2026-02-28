@@ -5,6 +5,7 @@ import { type SlimGroupMatch } from "@/app/lib/db";
 import { calcKda, formatKda } from "@/app/lib/helpers";
 import { cn } from "@/app/lib/utils";
 import { Users, ChevronDown } from "lucide-react";
+import Link from "next/link";
 
 const PAGE_SIZE = 10;
 
@@ -82,10 +83,11 @@ export default function GroupMatchHistory() {
           const duration = Math.floor(match.info.gameDuration / 60);
 
           return (
-            <div
+            <Link
               key={match.metadata.matchId}
+              href={`/match/${match.metadata.matchId}`}
               className={cn(
-                "rounded-xl border px-4 py-3 backdrop-blur-sm transition-colors",
+                "rounded-xl border px-4 py-3 backdrop-blur-sm transition-colors cursor-pointer block",
                 allWin
                   ? "border-emerald-800/40 bg-emerald-950/15 hover:bg-emerald-950/25"
                   : allLoss
@@ -149,7 +151,7 @@ export default function GroupMatchHistory() {
                   );
                 })}
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>

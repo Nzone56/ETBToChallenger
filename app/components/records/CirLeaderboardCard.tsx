@@ -4,7 +4,8 @@ import { useState } from "react";
 import { MatchRecord } from "@/app/lib/db";
 import ChampionIcon from "../ui/ChampionIcon";
 import { cirLabel, PILLARS, POSITION_LABELS, RAW_STATS } from "./RecordData";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ExternalLink } from "lucide-react";
+import Link from "next/link";
 
 function CirLeaderboardCard({
   record,
@@ -50,83 +51,85 @@ function CirLeaderboardCard({
   return (
     <div className={`rounded-xl border backdrop-blur-sm ${rankStyle}`}>
       {/* ── Header row (always visible, clickable) ── */}
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left"
-      >
-        {/* Rank */}
-        <div className="w-6 shrink-0 text-center">
-          <span className={`text-sm font-bold tabular-nums ${rankNumColor}`}>
-            {rank}
-          </span>
-        </div>
-
-        {/* Champion icon */}
-        <ChampionIcon
-          championName={record.championName}
-          version={version}
-          size={40}
-          className="shrink-0 rounded-lg"
-        />
-
-        {/* Main info */}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-semibold text-zinc-100 truncate">
-              {record.gameName}
+      <div className="relative">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left cursor-pointer"
+        >
+          {/* Rank */}
+          <div className="w-6 shrink-0 text-center">
+            <span className={`text-sm font-bold tabular-nums ${rankNumColor}`}>
+              {rank}
             </span>
-            {posLabel && (
-              <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
-                {posLabel}
+          </div>
+
+          {/* Champion icon */}
+          <ChampionIcon
+            championName={record.championName}
+            version={version}
+            size={40}
+            className="shrink-0 rounded-lg"
+          />
+
+          {/* Main info */}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-semibold text-zinc-100 truncate">
+                {record.gameName}
               </span>
-            )}
-            <span
-              className={`ml-auto text-[10px] font-semibold ${record.win ? "text-emerald-400" : "text-red-400"}`}
-            >
-              {record.win ? "WIN" : "LOSS"}
-            </span>
-          </div>
-          <div className="mt-0.5 text-xs text-zinc-500">
-            {record.kills}/{record.deaths}/{record.assists} ·{" "}
-            {Math.round(record.durationMin ?? 0)}min · {date}
-          </div>
-
-          {/* Pillar chips with values */}
-          {bd && (
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {PILLARS.map(({ key, label: pLabel, dotColor, textColor }) => (
-                <div
-                  key={key}
-                  className="flex items-center gap-1 rounded-md bg-zinc-800/60 px-1.5 py-0.5"
-                >
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotColor}`}
-                  />
-                  <span className="text-[9px] font-medium text-zinc-500 uppercase tracking-wide">
-                    {pLabel}
-                  </span>
-                  <span
-                    className={`text-[10px] font-bold tabular-nums ${textColor}`}
-                  >
-                    {bd[key].toFixed(1)}
-                  </span>
-                </div>
-              ))}
-              <ChevronDown
-                className={`cursor-pointer mt-0.5 h-3.5 w-3.5 text-zinc-600 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-              />
+              {posLabel && (
+                <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
+                  {posLabel}
+                </span>
+              )}
+              <span
+                className={`ml-auto text-[10px] font-semibold ${record.win ? "text-emerald-400" : "text-red-400"}`}
+              >
+                {record.win ? "WIN" : "LOSS"}
+              </span>
             </div>
-          )}
-        </div>
+            <div className="mt-0.5 text-xs text-zinc-500">
+              {record.kills}/{record.deaths}/{record.assists} ·{" "}
+              {Math.round(record.durationMin ?? 0)}min · {date}
+            </div>
 
-        {/* Score + chevron */}
-        <div className="shrink-0 flex flex-col items-end gap-0.5">
-          <div className={`text-xl font-bold tabular-nums ${color}`}>
-            {record.value.toFixed(1)}
+            {/* Pillar chips with values */}
+            {bd && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {PILLARS.map(({ key, label: pLabel, dotColor, textColor }) => (
+                  <div
+                    key={key}
+                    className="flex items-center gap-1 rounded-md bg-zinc-800/60 px-1.5 py-0.5"
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotColor}`}
+                    />
+                    <span className="text-[9px] font-medium text-zinc-500 uppercase tracking-wide">
+                      {pLabel}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold tabular-nums ${textColor}`}
+                    >
+                      {bd[key].toFixed(1)}
+                    </span>
+                  </div>
+                ))}
+                <ChevronDown
+                  className={`cursor-pointer mt-0.5 h-3.5 w-3.5 text-zinc-600 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+                />
+              </div>
+            )}
           </div>
-          <div className={`text-[10px] font-semibold ${color}`}>{label}</div>
-        </div>
-      </button>
+
+          {/* Score + chevron */}
+          <div className="shrink-0 flex flex-col items-end gap-0.5">
+            <div className={`text-xl font-bold tabular-nums ${color}`}>
+              {record.value.toFixed(1)}
+            </div>
+            <div className={`text-[10px] font-semibold ${color}`}>{label}</div>
+          </div>
+        </button>
+      </div>
 
       {/* ── Accordion body ── */}
       {open && st && (
@@ -189,6 +192,15 @@ function CirLeaderboardCard({
               },
             )}
           </div>
+
+          {/* Go to Match Button */}
+          <Link
+            href={`/match/${record.matchId}`}
+            className="mt-4 flex items-center justify-center gap-2 rounded-lg border border-teal-500/30 bg-teal-500/10 px-4 py-2 text-sm font-medium text-teal-400 transition-colors hover:bg-teal-500/20 cursor-pointer"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Go to Match
+          </Link>
         </div>
       )}
     </div>
