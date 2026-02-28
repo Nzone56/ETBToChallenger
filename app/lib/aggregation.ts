@@ -90,11 +90,12 @@ export function aggregatePlayerStats(
       assists: number;
       damage: number;
       games: number;
+      totalCir: number;
     }
   >();
   const roleMap = new Map<
     Position,
-    { wins: number; losses: number; games: number }
+    { wins: number; losses: number; games: number; totalCir: number }
   >();
 
   for (const match of validMatches) {
@@ -163,6 +164,7 @@ export function aggregatePlayerStats(
       assists: 0,
       damage: 0,
       games: 0,
+      totalCir: 0,
     };
     champ.games++;
     if (p.win) champ.wins++;
@@ -176,7 +178,12 @@ export function aggregatePlayerStats(
     // Role stats
     const pos = p.teamPosition as Position;
     if (pos && pos !== ("" as unknown as Position)) {
-      const role = roleMap.get(pos) ?? { wins: 0, losses: 0, games: 0 };
+      const role = roleMap.get(pos) ?? {
+        wins: 0,
+        losses: 0,
+        games: 0,
+        totalCir: 0,
+      };
       role.games++;
       if (p.win) role.wins++;
       else role.losses++;
@@ -223,6 +230,22 @@ export function aggregatePlayerStats(
       teamPosition: p.teamPosition,
     });
     totalCir += cirResult.score;
+
+    // Update champion CIR
+    const champForCir = champMap.get(p.championName);
+    if (champForCir) {
+      champForCir.totalCir += cirResult.score;
+      champMap.set(p.championName, champForCir);
+    }
+
+    // Update role CIR
+    if (pos && pos !== ("" as unknown as Position)) {
+      const roleForCir = roleMap.get(pos);
+      if (roleForCir) {
+        roleForCir.totalCir += cirResult.score;
+        roleMap.set(pos, roleForCir);
+      }
+    }
   }
 
   const total = validMatches.length;
@@ -239,6 +262,7 @@ export function aggregatePlayerStats(
       assists: s.assists,
       avgKda: calcKda(s.kills, s.deaths, s.assists),
       avgDamage: s.damage / s.games,
+      avgCir: s.totalCir / s.games,
     }))
     .sort((a, b) => b.games - a.games);
 
@@ -249,6 +273,7 @@ export function aggregatePlayerStats(
       wins: s.wins,
       losses: s.losses,
       winrate: calcWinrate(s.wins, s.games),
+      avgCir: s.totalCir / s.games,
     }))
     .sort((a, b) => b.games - a.games);
 

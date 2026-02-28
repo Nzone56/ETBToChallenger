@@ -161,6 +161,7 @@ export interface ChampionStats {
   assists: number;
   avgKda: number;
   avgDamage: number;
+  avgCir: number;
 }
 
 export interface RoleStats {
@@ -169,6 +170,7 @@ export interface RoleStats {
   wins: number;
   losses: number;
   winrate: number;
+  avgCir: number;
 }
 
 export interface PlayerAggregatedStats {
