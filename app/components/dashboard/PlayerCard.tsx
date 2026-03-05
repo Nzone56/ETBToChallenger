@@ -5,6 +5,7 @@ import {
   calcKda,
   formatKda,
   formatWinrate,
+  isRemake,
 } from "@/app/lib/helpers";
 import { POSITION_LABELS, rankToLp } from "@/app/data/constants";
 import { computeCIR_v3 } from "@/app/lib/cir";
@@ -107,8 +108,13 @@ export default function PlayerCard({ player, version }: PlayerCardProps) {
     ? getParticipant(player.lastMatch, player.puuid)
     : null;
 
+  const lastMatchIsRemake = player.lastMatch
+    ? isRemake(player.lastMatch.info.gameDuration)
+    : false;
+
   const cirScores = (() => {
     if (!lastMatchParticipant || !player.lastMatch) return null;
+    if (lastMatchIsRemake) return null;
     const p = lastMatchParticipant;
     const match = player.lastMatch;
     const durationMin = match.info.gameDuration / 60;
@@ -234,9 +240,11 @@ export default function PlayerCard({ player, version }: PlayerCardProps) {
           <div
             className={cn(
               "mt-3 flex items-center gap-3 rounded-lg border px-3 py-2",
-              lastMatchParticipant.win
-                ? "border-emerald-800/50 bg-emerald-950/20"
-                : "border-red-800/50 bg-red-950/20",
+              lastMatchIsRemake
+                ? "border-zinc-700/40 bg-zinc-900/30"
+                : lastMatchParticipant.win
+                  ? "border-emerald-800/50 bg-emerald-950/20"
+                  : "border-red-800/50 bg-red-950/20",
             )}
           >
             <ChampionIcon
@@ -249,12 +257,18 @@ export default function PlayerCard({ player, version }: PlayerCardProps) {
                 <span
                   className={cn(
                     "text-xs font-bold",
-                    lastMatchParticipant.win
-                      ? "text-emerald-400"
-                      : "text-red-400",
+                    lastMatchIsRemake
+                      ? "text-zinc-500"
+                      : lastMatchParticipant.win
+                        ? "text-emerald-400"
+                        : "text-red-400",
                   )}
                 >
-                  {lastMatchParticipant.win ? "WIN" : "LOSS"}
+                  {lastMatchIsRemake
+                    ? "REMAKE"
+                    : lastMatchParticipant.win
+                      ? "WIN"
+                      : "LOSS"}
                 </span>
                 <span className="text-xs text-zinc-400">
                   {lastMatchParticipant.championName}

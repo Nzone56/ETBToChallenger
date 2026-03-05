@@ -1,5 +1,6 @@
 import { Match, MatchParticipant } from "@/app/types/riot";
-import { Trophy, Clock, Calendar, Users } from "lucide-react";
+import { Trophy, Clock, Calendar, Users, RefreshCw } from "lucide-react";
+import { isRemake } from "@/app/lib/format";
 
 interface MatchHeaderProps {
   match: Match;
@@ -30,6 +31,7 @@ export default function MatchHeader({
 
   const team100 = match.info.teams.find((t) => t.teamId === 100);
   const team200 = match.info.teams.find((t) => t.teamId === 200);
+  const remake = isRemake(match.info.gameDuration);
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 backdrop-blur-sm">
@@ -78,47 +80,57 @@ export default function MatchHeader({
         </div>
 
         {/* Right: Team Results */}
-        <div className="flex gap-4">
-          <div
-            className={`rounded-lg border px-4 py-3 text-center ${
-              team100?.win
-                ? "border-emerald-500/40 bg-emerald-500/10"
-                : "border-red-500/40 bg-red-500/10"
-            }`}
-          >
+        {remake ? (
+          <div className="rounded-lg border border-zinc-700/40 bg-zinc-800/40 px-6 py-3 text-center">
             <div className="flex items-center gap-2">
-              <Trophy
-                className={`h-4 w-4 ${team100?.win ? "text-emerald-400" : "text-red-400"}`}
-              />
-              <span
-                className={`text-sm font-bold ${team100?.win ? "text-emerald-400" : "text-red-400"}`}
-              >
-                {team100?.win ? "VICTORY" : "DEFEAT"}
-              </span>
+              <RefreshCw className="h-4 w-4 text-zinc-500" />
+              <span className="text-sm font-bold text-zinc-400">REMAKE</span>
             </div>
-            <p className="mt-1 text-xs text-zinc-500">Blue Team</p>
+            <p className="mt-1 text-xs text-zinc-600">Game ended early</p>
           </div>
+        ) : (
+          <div className="flex gap-4">
+            <div
+              className={`rounded-lg border px-4 py-3 text-center ${
+                team100?.win
+                  ? "border-emerald-500/40 bg-emerald-500/10"
+                  : "border-red-500/40 bg-red-500/10"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Trophy
+                  className={`h-4 w-4 ${team100?.win ? "text-emerald-400" : "text-red-400"}`}
+                />
+                <span
+                  className={`text-sm font-bold ${team100?.win ? "text-emerald-400" : "text-red-400"}`}
+                >
+                  {team100?.win ? "VICTORY" : "DEFEAT"}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-zinc-500">Blue Team</p>
+            </div>
 
-          <div
-            className={`rounded-lg border px-4 py-3 text-center ${
-              team200?.win
-                ? "border-emerald-500/40 bg-emerald-500/10"
-                : "border-red-500/40 bg-red-500/10"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Trophy
-                className={`h-4 w-4 ${team200?.win ? "text-emerald-400" : "text-red-400"}`}
-              />
-              <span
-                className={`text-sm font-bold ${team200?.win ? "text-emerald-400" : "text-red-400"}`}
-              >
-                {team200?.win ? "VICTORY" : "DEFEAT"}
-              </span>
+            <div
+              className={`rounded-lg border px-4 py-3 text-center ${
+                team200?.win
+                  ? "border-emerald-500/40 bg-emerald-500/10"
+                  : "border-red-500/40 bg-red-500/10"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Trophy
+                  className={`h-4 w-4 ${team200?.win ? "text-emerald-400" : "text-red-400"}`}
+                />
+                <span
+                  className={`text-sm font-bold ${team200?.win ? "text-emerald-400" : "text-red-400"}`}
+                >
+                  {team200?.win ? "VICTORY" : "DEFEAT"}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-zinc-500">Red Team</p>
             </div>
-            <p className="mt-1 text-xs text-zinc-500">Red Team</p>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

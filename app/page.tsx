@@ -5,6 +5,7 @@ import {
   getLastMatchByPuuid,
   getLatestSyncedAt,
   getCirRoleAverages,
+  getLoneWolfStats,
 } from "./lib/db";
 import {
   computeAverageElo,
@@ -27,6 +28,7 @@ import PlayerCard from "./components/dashboard/PlayerCard";
 import BestOfSection from "./components/dashboard/BestOfSection";
 import RoleLeaderboard from "./components/dashboard/RoleLeaderboard";
 import RoleCirLeaderboard from "./components/dashboard/RoleCirLeaderboard";
+import LoneWolf from "./components/dashboard/LoneWolf";
 import SyncTrigger from "./components/SyncTrigger";
 
 // Revalidate every 15 minutes — unstable_cache prevents redundant DB reads
@@ -39,6 +41,7 @@ export default async function Home() {
     statsRows,
     lastMatches,
     cirRoleAverages,
+    loneWolfStats,
     version,
     syncedAt,
   ] = await Promise.all([
@@ -46,6 +49,7 @@ export default async function Home() {
     getAllPlayerStats(),
     Promise.all(users.map((u) => getLastMatchByPuuid(u.puuid))),
     getCirRoleAverages(puuids),
+    getLoneWolfStats(puuids),
     getDdragonVersion(),
     getLatestSyncedAt(),
   ]);
@@ -105,6 +109,15 @@ export default async function Home() {
       ? computeBestOfChallenge(eligibleForBestOf)
       : null;
 
+  // Enrich lone wolf entries with profile icon from snapshot
+  const enrichedLoneWolfStats = loneWolfStats.map((entry) => {
+    const snap = snapshotMap.get(entry.puuid);
+    const summoner: Summoner | null = snap?.summonerJson
+      ? JSON.parse(snap.summonerJson)
+      : null;
+    return { ...entry, profileIconId: summoner?.profileIconId ?? null };
+  });
+
   const { avgLp, avgTierLabel } = computeAverageElo(
     dashboardData.map((p) => p.flexEntry),
   );
@@ -154,6 +167,7 @@ export default async function Home() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="lg:col-span-1 space-y-4">
                 <Leaderboard players={dashboardData} version={version} />
+                <LoneWolf entries={enrichedLoneWolfStats} version={version} />
                 <RoleLeaderboard players={playerStatsData} version={version} />
                 <RoleCirLeaderboard
                   entries={cirRoleAverages}

@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { cn } from "@/app/lib/utils";
 import { getProfileIconUrl } from "@/app/data/constants";
 
@@ -42,12 +41,13 @@ export default function ProfileIcon({
   }
 
   return (
-    <Image
+    <img
       src={getProfileIconUrl(iconId, version)}
       alt="Profile icon"
       width={size}
       height={size}
       className={cn("shrink-0 rounded-full", className)}
+      loading="lazy"
     />
   );
 }

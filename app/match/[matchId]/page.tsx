@@ -2,6 +2,7 @@ import { getMatchById } from "@/app/lib/db";
 import { getDdragonVersion } from "@/app/lib/service";
 import { Match } from "@/app/types/riot";
 import { users } from "@/app/data/users";
+import { isRemake } from "@/app/lib/format";
 import MatchHeader from "@/app/components/match/MatchHeader";
 import MatchTeamTable from "@/app/components/match/MatchTeamTable";
 import MatchStats from "@/app/components/match/MatchStats";
@@ -41,6 +42,7 @@ export default async function MatchPage({ params }: MatchPageProps) {
   }
   const match = matchData as Match;
   const version = await getDdragonVersion();
+  const remake = isRemake(match.info.gameDuration);
 
   // Identify challenge players in this match
   const challengePuuids = new Set(users.map((u) => u.puuid));
@@ -60,21 +62,25 @@ export default async function MatchPage({ params }: MatchPageProps) {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <GoBackButton />
+      <div className="animate-fade-in">
+        <GoBackButton />
+      </div>
 
-      <div className="space-y-6">
+      <div className="mt-4 space-y-6 stagger-children">
         {/* Match Header */}
         <MatchHeader
           match={match}
           challengeParticipants={challengeParticipants}
         />
 
-        {/* MVP Section */}
-        <MatchMVP
-          match={match}
-          allParticipants={match.info.participants}
-          version={version}
-        />
+        {/* MVP Section — hidden for remakes */}
+        {!remake && (
+          <MatchMVP
+            match={match}
+            allParticipants={match.info.participants}
+            version={version}
+          />
+        )}
 
         {/* Team Tables */}
         <div className="space-y-4">
@@ -96,11 +102,13 @@ export default async function MatchPage({ params }: MatchPageProps) {
           />
         </div>
 
-        {/* Match Statistics */}
-        <MatchStats
-          match={match}
-          challengeParticipants={challengeParticipants}
-        />
+        {/* Team Comparison — hidden for remakes */}
+        {!remake && (
+          <MatchStats
+            match={match}
+            challengeParticipants={challengeParticipants}
+          />
+        )}
       </div>
     </main>
   );

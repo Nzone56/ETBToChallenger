@@ -97,6 +97,8 @@ export const getMatchesByPuuid = cache(
   async (puuid: string): Promise<object[]> => {
     await ensureSchema();
     const db = getDb();
+    const { SEASON_START_EPOCH, QUEUE_FLEX } =
+      await import("../data/constants");
     const res = await db.execute({
       sql: `SELECT m.data FROM matches m
           JOIN player_matches pm ON pm.match_id = m.match_id
@@ -104,7 +106,15 @@ export const getMatchesByPuuid = cache(
           ORDER BY pm.played_at DESC`,
       args: [puuid],
     });
-    return res.rows.map((r) => JSON.parse(r.data as string));
+    // Filter for current season + Flex queue
+    return res.rows
+      .map((r) => JSON.parse(r.data as string))
+      .filter((match: any) => {
+        return (
+          match.info.gameStartTimestamp >= SEASON_START_EPOCH &&
+          match.info.queueId === QUEUE_FLEX
+        );
+      });
   },
 );
 
@@ -673,10 +683,10 @@ const _getMatchRecords = unstable_cache(
           };
         };
 
-        // Season + Flex queue filter + skip remakes (<10 min)
+        // Season + Flex queue filter + skip remakes (<5 min)
         if (match.info.gameStartTimestamp < SEASON_START_EPOCH) continue;
         if (match.info.queueId !== QUEUE_FLEX) continue;
-        if (match.info.gameDuration < 600) continue;
+        if (match.info.gameDuration < 300) continue;
 
         const p = match.info.participants.find((pt) => pt.puuid === puuid);
         if (!p) continue;
@@ -920,7 +930,7 @@ const _getCirRoleAverages = unstable_cache(
 
         if (match.info.gameStartTimestamp < SEASON_START_EPOCH) continue;
         if (match.info.queueId !== QUEUE_FLEX) continue;
-        if (match.info.gameDuration < 600) continue;
+        if (match.info.gameDuration < 300) continue; // skip remakes (<5 min)
 
         const p = match.info.participants.find((pt) => pt.puuid === puuid);
         if (!p || !p.teamPosition) continue;
@@ -996,6 +1006,105 @@ export async function getCirRoleAverages(
   puuids: string[],
 ): Promise<CirRoleEntry[]> {
   return _getCirRoleAverages(puuids);
+}
+
+export interface LoneWolfEntry {
+  puuid: string;
+  gameName: string;
+  soloGames: number; // only this challenge player in the match
+  duoGames: number; // exactly 2 challenge players in the match
+  score: number; // soloGames * 5 + duoGames * 1
+  profileIconId?: number | null;
+}
+
+const _getLoneWolfStats = unstable_cache(
+  async (puuids: string[]): Promise<LoneWolfEntry[]> => {
+    await ensureSchema();
+    const db = getDb();
+    const { SEASON_START_EPOCH, QUEUE_FLEX } =
+      await import("../data/constants");
+    const puuidSet = new Set(puuids);
+
+    // Accumulate per-player counts
+    const acc = new Map<
+      string,
+      {
+        gameName: string;
+        solo: number;
+        duo: number;
+        profileIconId?: number | null;
+      }
+    >();
+    for (const puuid of puuids) {
+      acc.set(puuid, { gameName: puuid, solo: 0, duo: 0 });
+    }
+
+    // Fetch all matches for all challenge players at once via group query
+    const res = await db.execute(
+      `SELECT DISTINCT m.match_id, m.data FROM matches m
+       JOIN player_matches pm ON pm.match_id = m.match_id
+       WHERE pm.puuid IN (${puuids.map(() => "?").join(",")})
+       ORDER BY m.match_id`,
+      puuids,
+    );
+
+    for (const row of res.rows) {
+      const match = JSON.parse(row.data as string) as {
+        info: {
+          gameDuration: number;
+          gameStartTimestamp: number;
+          queueId: number;
+          participants: {
+            puuid: string;
+            riotIdGameName?: string;
+            profileIconId?: number | null;
+          }[];
+        };
+      };
+
+      if (match.info.gameStartTimestamp < SEASON_START_EPOCH) continue;
+      if (match.info.queueId !== QUEUE_FLEX) continue;
+      if (match.info.gameDuration < 300) continue; // skip remakes
+
+      // Count how many challenge players participated
+      const participatingPuuids = match.info.participants
+        .filter((p) => puuidSet.has(p.puuid))
+        .map((p) => p.puuid);
+
+      const count = participatingPuuids.length;
+      if (count === 0) continue;
+
+      for (const p of match.info.participants) {
+        if (!puuidSet.has(p.puuid)) continue;
+        const entry = acc.get(p.puuid);
+        if (!entry) continue;
+        if (!entry.gameName || entry.gameName === p.puuid) {
+          entry.gameName = p.riotIdGameName ?? p.puuid;
+        }
+        if (count === 1) entry.solo++;
+        else if (count === 2) entry.duo++;
+        // 3+ players together: not counted (group game)
+      }
+    }
+
+    return Array.from(acc.entries()).map(
+      ([puuid, { gameName, solo, duo }]) => ({
+        puuid,
+        gameName,
+        soloGames: solo,
+        duoGames: duo,
+        score: solo * 5 + duo * 1,
+      }),
+    );
+  },
+  ["lone-wolf-stats"],
+  { tags: [DB_TAG], revalidate: 900 },
+);
+
+export async function getLoneWolfStats(
+  puuids: string[],
+): Promise<LoneWolfEntry[]> {
+  return _getLoneWolfStats(puuids);
 }
 
 // ─── DB stats ───

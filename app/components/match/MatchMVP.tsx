@@ -107,7 +107,7 @@ export default function MatchMVP({
           {/* CIR */}
           <div
             className={cn(
-              "rounded border px-2 py-1 text-center min-w-[52px]",
+              "rounded border px-2 py-1 text-center min-w-[52]",
               cirBg,
             )}
           >
@@ -122,7 +122,7 @@ export default function MatchMVP({
           </div>
 
           {/* KDA */}
-          <div className="rounded border border-zinc-800 bg-zinc-900/40 px-2 py-1 text-center min-w-[52px]">
+          <div className="rounded border border-zinc-800 bg-zinc-900/40 px-2 py-1 text-center min-w-[52]">
             <div className="text-sm sm:text-base font-bold text-emerald-400 tabular-nums">
               {formatKda(kda)}
             </div>
@@ -130,7 +130,7 @@ export default function MatchMVP({
           </div>
 
           {/* Damage */}
-          <div className="rounded border border-zinc-800 bg-zinc-900/40 px-2 py-1 text-center min-w-[52px]">
+          <div className="rounded border border-zinc-800 bg-zinc-900/40 px-2 py-1 text-center min-w-[52]">
             <div className="text-sm sm:text-base font-bold text-orange-400 tabular-nums">
               {Math.round(mvp.totalDamageDealtToChampions / 1000)}k
             </div>
@@ -138,7 +138,7 @@ export default function MatchMVP({
           </div>
 
           {/* Gold */}
-          <div className="rounded border border-zinc-800 bg-zinc-900/40 px-2 py-1 text-center min-w-[52px]">
+          <div className="rounded border border-zinc-800 bg-zinc-900/40 px-2 py-1 text-center min-w-[52]">
             <div className="text-sm sm:text-base font-bold text-yellow-400 tabular-nums">
               {(mvp.goldEarned / 1000).toFixed(1)}k
             </div>
