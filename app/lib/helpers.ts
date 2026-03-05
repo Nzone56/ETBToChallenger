@@ -19,6 +19,8 @@ export {
   calcWinrate,
   formatWinrate,
   calcCsPerMin,
+  isRemake,
+  REMAKE_THRESHOLD_SECONDS,
 } from "./format";
 export { aggregatePlayerStats, EMPTY_STATS } from "./aggregation";
 export { computeBestOfChallenge } from "./ranking";

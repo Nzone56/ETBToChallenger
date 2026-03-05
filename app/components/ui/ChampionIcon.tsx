@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { cn } from "@/app/lib/utils";
 import { getChampionIconUrl } from "@/app/data/constants";
 
@@ -16,12 +15,13 @@ export default function ChampionIcon({
   className,
 }: ChampionIconProps) {
   return (
-    <Image
+    <img
       src={getChampionIconUrl(championName, version)}
       alt={championName}
       width={size}
       height={size}
       className={cn("rounded-lg", className)}
+      loading="lazy"
     />
   );
 }

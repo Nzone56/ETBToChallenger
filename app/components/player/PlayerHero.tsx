@@ -39,7 +39,6 @@ export default function PlayerHero({
       {/* Skin background */}
       {skinUrl && (
         <div className="absolute inset-0 z-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={skinUrl}
             alt=""

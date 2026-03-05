@@ -38,3 +38,10 @@ export function calcCsPerMin(cs: number, gameDurationSeconds: number): number {
   if (minutes === 0) return 0;
   return cs / minutes;
 }
+
+// ─── Remake detection (< 5 min = remake) ───
+export const REMAKE_THRESHOLD_SECONDS = 300;
+
+export function isRemake(gameDurationSeconds: number): boolean {
+  return gameDurationSeconds < REMAKE_THRESHOLD_SECONDS;
+}

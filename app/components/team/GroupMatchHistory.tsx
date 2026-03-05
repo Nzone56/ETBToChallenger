@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { type SlimGroupMatch } from "@/app/lib/db";
-import { calcKda, formatKda } from "@/app/lib/helpers";
+import { calcKda, formatKda, isRemake } from "@/app/lib/helpers";
 import { cn } from "@/app/lib/utils";
 import { Users, ChevronDown } from "lucide-react";
 import Link from "next/link";
@@ -79,7 +79,14 @@ export default function GroupMatchHistory() {
             return p && !p.win;
           });
 
-          const resultLabel = allWin ? "WIN" : allLoss ? "LOSS" : "MIXED";
+          const remake = isRemake(match.info.gameDuration);
+          const resultLabel = remake
+            ? "REMAKE"
+            : allWin
+              ? "WIN"
+              : allLoss
+                ? "LOSS"
+                : "MIXED";
           const duration = Math.floor(match.info.gameDuration / 60);
 
           return (
@@ -88,11 +95,13 @@ export default function GroupMatchHistory() {
               href={`/match/${match.metadata.matchId}`}
               className={cn(
                 "rounded-xl border px-4 py-3 backdrop-blur-sm transition-colors cursor-pointer block",
-                allWin
-                  ? "border-emerald-800/40 bg-emerald-950/15 hover:bg-emerald-950/25"
-                  : allLoss
-                    ? "border-red-800/40 bg-red-950/15 hover:bg-red-950/25"
-                    : "border-zinc-700/40 bg-zinc-900/40 hover:bg-zinc-800/40",
+                remake
+                  ? "border-zinc-700/40 bg-zinc-900/30 hover:bg-zinc-900/50"
+                  : allWin
+                    ? "border-emerald-800/40 bg-emerald-950/15 hover:bg-emerald-950/25"
+                    : allLoss
+                      ? "border-red-800/40 bg-red-950/15 hover:bg-red-950/25"
+                      : "border-zinc-700/40 bg-zinc-900/40 hover:bg-zinc-800/40",
               )}
             >
               {/* Header */}
@@ -101,11 +110,13 @@ export default function GroupMatchHistory() {
                   <span
                     className={cn(
                       "rounded-md px-2 py-0.5 text-xs font-bold",
-                      allWin
-                        ? "bg-emerald-500/20 text-emerald-400"
-                        : allLoss
-                          ? "bg-red-500/20 text-red-400"
-                          : "bg-zinc-500/20 text-zinc-400",
+                      remake
+                        ? "bg-zinc-700/40 text-zinc-500"
+                        : allWin
+                          ? "bg-emerald-500/20 text-emerald-400"
+                          : allLoss
+                            ? "bg-red-500/20 text-red-400"
+                            : "bg-zinc-500/20 text-zinc-400",
                     )}
                   >
                     {resultLabel}

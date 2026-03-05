@@ -6,7 +6,13 @@ import {
   Position,
 } from "../types/riot";
 import { SEASON_START_EPOCH } from "../data/constants";
-import { getParticipant, calcKda, calcWinrate, calcCsPerMin } from "./format";
+import {
+  getParticipant,
+  calcKda,
+  calcWinrate,
+  calcCsPerMin,
+  isRemake,
+} from "./format";
 import { computeCIR_v3 } from "./cir";
 
 // ─── Empty stats sentinel (used when DB has no data yet) ───
@@ -52,7 +58,8 @@ export function aggregatePlayerStats(
   const validMatches = matches.filter(
     (m) =>
       getParticipant(m, puuid) &&
-      m.info.gameStartTimestamp >= SEASON_START_EPOCH,
+      m.info.gameStartTimestamp >= SEASON_START_EPOCH &&
+      !isRemake(m.info.gameDuration),
   );
 
   if (validMatches.length === 0) return { ...ZERO_STATS };

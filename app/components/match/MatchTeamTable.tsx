@@ -6,11 +6,10 @@ import {
   getCirBgColor,
   getCirTierLetter,
 } from "@/app/lib/cirUtils";
-import { formatKda, calcKda } from "@/app/lib/helpers";
+import { formatKda, calcKda, isRemake } from "@/app/lib/helpers";
 import { POSITION_LABELS } from "@/app/data/constants";
 import Link from "next/link";
 import { cn } from "@/app/lib/utils";
-import Image from "next/image";
 import { Flame, Crown, Eye } from "lucide-react";
 
 interface MatchTeamTableProps {
@@ -91,34 +90,43 @@ export default function MatchTeamTable({
   });
 
   const team = match.info.teams.find((t) => t.teamId === teamId);
+  const remake = isRemake(match.info.gameDuration);
 
   return (
     <div
       className={cn(
         "rounded-xl border backdrop-blur-sm overflow-hidden",
-        win
-          ? "border-emerald-800/40 bg-emerald-950/10"
-          : "border-red-800/40 bg-red-950/10",
+        remake
+          ? "border-zinc-700/40 bg-zinc-900/20"
+          : win
+            ? "border-emerald-800/40 bg-emerald-950/10"
+            : "border-red-800/40 bg-red-950/10",
       )}
     >
       {/* Header */}
       <div
         className={cn(
           "px-4 py-2 border-b",
-          win
-            ? "bg-emerald-500/10 border-emerald-800/40"
-            : "bg-red-500/10 border-red-800/40",
+          remake
+            ? "bg-zinc-800/30 border-zinc-700/40"
+            : win
+              ? "bg-emerald-500/10 border-emerald-800/40"
+              : "bg-red-500/10 border-red-800/40",
         )}
       >
         <div className="flex items-center justify-between">
           <h3
             className={cn(
               "text-lg font-bold",
-              win ? "text-emerald-400" : "text-red-400",
+              remake
+                ? "text-zinc-500"
+                : win
+                  ? "text-emerald-400"
+                  : "text-red-400",
             )}
           >
             {teamId === 100 ? "Blue Team" : "Red Team"} -{" "}
-            {win ? "Victory" : "Defeat"}
+            {remake ? "Remake" : win ? "Victory" : "Defeat"}
           </h3>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-zinc-500">
             <span className="font-medium text-[11px] sm:text-xs">
@@ -368,12 +376,13 @@ export default function MatchTeamTable({
                           className="h-7 w-7 sm:h-8 sm:w-8 rounded border border-zinc-700 bg-zinc-800/50 overflow-hidden shrink-0"
                         >
                           {itemId > 0 && (
-                            <Image
+                            <img
                               src={`https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemId}.png`}
                               alt={`Item ${itemId}`}
                               width={32}
                               height={32}
                               className="h-full w-full object-cover"
+                              loading="lazy"
                             />
                           )}
                         </div>
@@ -381,12 +390,13 @@ export default function MatchTeamTable({
                       {/* Trinket (item6) */}
                       {trinket > 0 && (
                         <div className="h-7 w-7 sm:h-8 sm:w-8 rounded border border-amber-600/50 bg-amber-900/20 overflow-hidden shrink-0">
-                          <Image
+                          <img
                             src={`https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${trinket}.png`}
                             alt={`Trinket ${trinket}`}
                             width={32}
                             height={32}
                             className="h-full w-full object-cover"
+                            loading="lazy"
                           />
                         </div>
                       )}

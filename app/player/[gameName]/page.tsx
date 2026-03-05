@@ -4,7 +4,7 @@ import {
   getPlayerStats,
   getMatchesByPuuidPaged,
 } from "@/app/lib/db";
-import { getUserByRiotId } from "@/app/data/users";
+import { getUserByRiotId, users } from "@/app/data/users";
 import { notFound } from "next/navigation";
 import PlayerHero from "@/app/components/player/PlayerHero";
 import PlayerStatsGrid from "@/app/components/player/PlayerStatsGrid";
@@ -119,6 +119,9 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
             version={version}
             pageSize={10}
             totalGames={stats.totalGames}
+            companions={users
+              .filter((u) => u.puuid !== user.puuid)
+              .map((u) => ({ puuid: u.puuid, gameName: u.gameName }))}
           />
         </div>
       )}
