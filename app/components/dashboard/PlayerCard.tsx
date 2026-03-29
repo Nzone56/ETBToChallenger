@@ -14,8 +14,10 @@ import KdaDisplay from "@/app/components/ui/KdaDisplay";
 import ChampionIcon from "@/app/components/ui/ChampionIcon";
 import ProfileIcon from "@/app/components/ui/ProfileIcon";
 import WinrateBar from "@/app/components/ui/WinrateBar";
-import { cn } from "@/app/lib/utils";
 import { ChevronRight } from "lucide-react";
+import { cn } from "@/app/lib/utils";
+import ItemsDisplay from "@/app/components/ui/ItemsDisplay";
+import MatchStats from "@/app/components/ui/MatchStats";
 
 function cirLabel(score: number): {
   label: string;
@@ -239,7 +241,7 @@ export default function PlayerCard({ player, version }: PlayerCardProps) {
         {lastMatchParticipant && player.lastMatch && (
           <div
             className={cn(
-              "mt-3 flex items-center gap-3 rounded-lg border px-3 py-2",
+              "mt-3 rounded-lg border px-3 py-2.5",
               lastMatchIsRemake
                 ? "border-zinc-700/40 bg-zinc-900/30"
                 : lastMatchParticipant.win
@@ -247,60 +249,100 @@ export default function PlayerCard({ player, version }: PlayerCardProps) {
                   : "border-red-800/50 bg-red-950/20",
             )}
           >
-            <ChampionIcon
-              championName={lastMatchParticipant.championName}
-              version={version}
-              size={32}
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span
-                  className={cn(
-                    "text-xs font-bold",
-                    lastMatchIsRemake
-                      ? "text-zinc-500"
-                      : lastMatchParticipant.win
-                        ? "text-emerald-400"
-                        : "text-red-400",
-                  )}
-                >
-                  {lastMatchIsRemake
-                    ? "REMAKE"
-                    : lastMatchParticipant.win
-                      ? "WIN"
-                      : "LOSS"}
-                </span>
-                <span className="text-xs text-zinc-400">
-                  {lastMatchParticipant.championName}
-                </span>
-                <span className="text-xs text-zinc-600">
-                  {POSITION_LABELS[
-                    lastMatchParticipant.teamPosition as keyof typeof POSITION_LABELS
-                  ] ?? lastMatchParticipant.teamPosition}
-                </span>
-              </div>
-              <KdaDisplay
-                kills={lastMatchParticipant.kills}
-                deaths={lastMatchParticipant.deaths}
-                assists={lastMatchParticipant.assists}
-                size="sm"
+            <div className="flex items-start gap-2 sm:gap-3">
+              <ChampionIcon
+                championName={lastMatchParticipant.championName}
+                version={version}
+                size={36}
+                className="shrink-0"
               />
-            </div>
-            <div className="text-right">
-              <div className="text-xs font-medium text-zinc-300">
-                {formatKda(
-                  calcKda(
-                    lastMatchParticipant.kills,
-                    lastMatchParticipant.deaths,
-                    lastMatchParticipant.assists,
-                  ),
-                )}{" "}
-                KDA
+              <div className="flex-1 min-w-0 space-y-1.5">
+                {/* Row 1: Status + Champion + Position + Duration */}
+                <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                  <span
+                    className={cn(
+                      "text-xs font-bold uppercase tracking-wide",
+                      lastMatchIsRemake
+                        ? "text-zinc-500"
+                        : lastMatchParticipant.win
+                          ? "text-emerald-400"
+                          : "text-red-400",
+                    )}
+                  >
+                    {lastMatchIsRemake
+                      ? "REMAKE"
+                      : lastMatchParticipant.win
+                        ? "WIN"
+                        : "LOSS"}
+                  </span>
+                  <span className="text-xs text-zinc-500 hidden sm:inline">
+                    •
+                  </span>
+                  <span className="text-xs font-medium text-zinc-300 truncate">
+                    {lastMatchParticipant.championName}
+                  </span>
+                  <span className="text-xs text-zinc-500 hidden sm:inline">
+                    {POSITION_LABELS[
+                      lastMatchParticipant.teamPosition as keyof typeof POSITION_LABELS
+                    ] ?? lastMatchParticipant.teamPosition}
+                  </span>
+                  <span className="text-xs text-zinc-600">
+                    {Math.floor(player.lastMatch.info.gameDuration / 60)}m
+                  </span>
+                </div>
+
+                {/* Row 2: KDA */}
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <KdaDisplay
+                    kills={lastMatchParticipant.kills}
+                    deaths={lastMatchParticipant.deaths}
+                    assists={lastMatchParticipant.assists}
+                    size="sm"
+                  />
+                  <span className="text-xs font-semibold text-zinc-400">
+                    {formatKda(
+                      calcKda(
+                        lastMatchParticipant.kills,
+                        lastMatchParticipant.deaths,
+                        lastMatchParticipant.assists,
+                      ),
+                    )}{" "}
+                    <span className="text-zinc-600">KDA</span>
+                  </span>
+                  {/* CIR Badge inline on mobile */}
+                </div>
+
+                {/* Row 3: Items + Stats (stack on mobile) */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                  <ItemsDisplay
+                    item0={lastMatchParticipant.item0}
+                    item1={lastMatchParticipant.item1}
+                    item2={lastMatchParticipant.item2}
+                    item3={lastMatchParticipant.item3}
+                    item4={lastMatchParticipant.item4}
+                    item5={lastMatchParticipant.item5}
+                    item6={lastMatchParticipant.item6}
+                    version={version}
+                    size="sm"
+                  />
+                  <MatchStats
+                    cs={
+                      lastMatchParticipant.totalMinionsKilled +
+                      lastMatchParticipant.neutralMinionsKilled
+                    }
+                    gold={lastMatchParticipant.goldEarned}
+                    damage={lastMatchParticipant.totalDamageDealtToChampions}
+                    size="sm"
+                  />
+                </div>
               </div>
-              <div className="text-xs text-zinc-600">
-                {Math.floor(player.lastMatch.info.gameDuration / 60)}m
-              </div>
-              {cirScores && <CirBadge score={cirScores.score} />}
+
+              {/* CIR Badge on desktop */}
+              {cirScores && (
+                <div className="shrink-0">
+                  <CirBadge score={cirScores.score} />
+                </div>
+              )}
             </div>
           </div>
         )}

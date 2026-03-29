@@ -20,7 +20,7 @@ export default async function MatchPage({ params }: MatchPageProps) {
   const matchData = await getMatchById(matchId);
   if (!matchData) {
     return (
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
           <div className="rounded-xl border border-red-800/40 bg-red-950/20 px-8 py-12 max-w-md">
             <h1 className="text-3xl font-bold text-red-400 mb-3">
@@ -61,7 +61,7 @@ export default async function MatchPage({ params }: MatchPageProps) {
     match.info.teams.find((t) => t.teamId === 200)?.win ?? false;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
       <div className="animate-fade-in">
         <GoBackButton />
       </div>

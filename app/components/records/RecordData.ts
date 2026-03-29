@@ -8,6 +8,8 @@ export const BEST_ORDER = [
   "Highest CS/min",
   "Highest Gold Lead",
   "Highest DMG Lead",
+  "1vs9 GOAT",
+  "Lane Dominator King",
 ];
 
 export const WORST_ORDER = [
@@ -17,6 +19,8 @@ export const WORST_ORDER = [
   "Lowest CS/min",
   "Lowest Gold Lead",
   "Lowest DMG Lead",
+  "Dead Weight Anchor",
+  "Diffed Gap",
 ];
 
 export const CIR_TABS = [

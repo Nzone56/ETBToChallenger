@@ -56,11 +56,13 @@ export default function FinalRankings({
 
   return (
     <div>
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-        <Trophy className="h-4 w-4 text-yellow-400" />
-        Final Rankings
+      <h2 className="mb-3 flex justify-between items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
+        <div className="flex items-center gap-2">
+          <Trophy className="h-4 w-4 text-yellow-400" />
+          Final Rankings
+        </div>
         <span className="text-xs font-normal text-zinc-600">
-          avg position across {total} categories · lower = better
+          avg position across {total} categories
         </span>
       </h2>
 

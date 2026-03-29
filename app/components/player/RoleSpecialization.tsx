@@ -12,18 +12,18 @@ const ROLE_ORDER: Position[] = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
 
 const ROLE_COLORS: Record<Position, string> = {
   TOP: "bg-blue-500",
-  JUNGLE: "bg-emerald-500",
+  JUNGLE: "bg-rose-500",
   MIDDLE: "bg-yellow-400",
   BOTTOM: "bg-purple-500",
-  UTILITY: "bg-teal-400",
+  UTILITY: "bg-lime-400",
 };
 
 const ROLE_TEXT_COLORS: Record<Position, string> = {
   TOP: "text-blue-400",
-  JUNGLE: "text-emerald-400",
+  JUNGLE: "text-rose-400",
   MIDDLE: "text-yellow-400",
   BOTTOM: "text-purple-400",
-  UTILITY: "text-teal-400",
+  UTILITY: "text-lime-400",
 };
 
 export default function RoleSpecialization({

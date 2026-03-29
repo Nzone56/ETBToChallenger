@@ -52,7 +52,7 @@ function CirLeaderboardCard({
       <div className="relative">
         <button
           onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center gap-3 px-4 py-3 text-left cursor-pointer"
+          className="flex w-full items-center gap-1.5 sm:gap-3 px-2 sm:px-4 py-2 sm:py-3 text-left cursor-pointer"
         >
           {/* Rank */}
           <div className="w-6 shrink-0 text-center">
@@ -80,11 +80,6 @@ function CirLeaderboardCard({
                   {posLabel}
                 </span>
               )}
-              <span
-                className={`ml-auto text-[10px] font-semibold ${record.win ? "text-emerald-400" : "text-red-400"}`}
-              >
-                {record.win ? "WIN" : "LOSS"}
-              </span>
             </div>
             <div className="mt-0.5 text-xs text-zinc-500">
               {record.kills}/{record.deaths}/{record.assists} ·{" "}
@@ -93,7 +88,7 @@ function CirLeaderboardCard({
 
             {/* Pillar chips with values */}
             {bd && (
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <div className="mt-1.5 flex flex-wrap gap-1 sm:gap-1.5">
                 {PILLARS.map(({ key, label: pLabel, dotColor, textColor }) => (
                   <div
                     key={key}
@@ -102,7 +97,7 @@ function CirLeaderboardCard({
                     <span
                       className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotColor}`}
                     />
-                    <span className="text-[9px] font-medium text-zinc-500 uppercase tracking-wide">
+                    <span className="text-[9px] font-medium text-zinc-500 uppercase tracking-wide hidden sm:block ">
                       {pLabel}
                     </span>
                     <span
@@ -121,6 +116,11 @@ function CirLeaderboardCard({
 
           {/* Score + chevron */}
           <div className="shrink-0 flex flex-col items-end gap-0.5">
+            <span
+              className={`ml-auto text-[10px] font-semibold ${record.win ? "text-emerald-400" : "text-red-400"}`}
+            >
+              {record.win ? "WIN" : "LOSS"}
+            </span>
             <div className={`text-xl font-bold tabular-nums ${color}`}>
               {record.value.toFixed(1)}
             </div>
