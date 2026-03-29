@@ -39,19 +39,21 @@ export default function ChallengeHeader({
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 backdrop-blur-sm">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+      <div className="flex flex-row gap-4 items-center  justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white">
             ETB to Challenger
           </h1>
-          <p className="mt-1 flex items-center gap-1.5 text-sm text-zinc-400">
+          <p className="flex items-center gap-1.5 text-sm text-zinc-400">
             {playerCount} players · Average Elo:{" "}
             <RankEmblem tier={avgTier} size={18} />
             <span className="font-semibold text-zinc-200">{avgTierLabel}</span>
           </p>
         </div>
         <div className="text-right">
-          <div className="text-3xl font-bold text-white">{avgLp}</div>
+          <div className="text-xl md:text-2xl font-bold text-white">
+            {avgLp}
+          </div>
           <div className="text-xs uppercase tracking-wider text-zinc-500">
             Average LP
           </div>
