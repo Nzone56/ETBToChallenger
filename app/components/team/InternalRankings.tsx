@@ -78,11 +78,11 @@ export default function InternalRankings({
 
   return (
     <div>
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-3 flex flex-col gap-2  md:items-center sm:justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
           Internal Rankings
         </h2>
-        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex gap-1 overflow-x-auto pb-1  scrollbar-thin scrollbar-track-transparent scrollbar-thumb-zinc-700">
           {SORT_OPTIONS.map((option) => (
             <button
               key={option.key}

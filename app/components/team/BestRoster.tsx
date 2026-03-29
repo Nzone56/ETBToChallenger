@@ -30,30 +30,6 @@ export default function BestRoster({
 }: BestRosterProps) {
   const iconMap = new Map(players.map((p) => [p.gameName, p.profileIconId]));
 
-  // // Build candidate pools per role (min 3 games)
-  // const candidatesByRole = ROLES.map((role) => ({
-  //   role,
-  //   candidates: entries
-  //     .filter((e) => e.position === role && e.games >= 3)
-  //     .sort((a, b) => b.avgCir - a.avgCir),
-  // }));
-
-  // // Simple greedy approach: for each role, pick the best available player
-  // // This guarantees no player repeats and maximizes individual role performance
-  // const usedPlayers = new Set<string>();
-  // const bestRoster = ROLES.map((role) => {
-  //   const roleData = candidatesByRole.find((r) => r.role === role);
-  //   if (!roleData) return { role, best: null };
-
-  //   // Find first candidate not already used
-  //   const best =
-  //     roleData.candidates.find((c) => !usedPlayers.has(c.gameName)) ?? null;
-  //   if (best) {
-  //     usedPlayers.add(best.gameName);
-  //   }
-  //   return { role, best };
-  // });
-
   const bestRoster = useMemo(() => {
     // 1. Organize candidates by role
     const candidatesByRole = ROLES.map((role) => ({
@@ -106,9 +82,6 @@ export default function BestRoster({
           usedNames.delete(candidate.gameName);
           currentMap.delete(role);
           branched = true;
-
-          // Optimization: If you have a huge dataset, you could break early here
-          // if currentTotal + theoreticalMax < maxTotalCir
         }
       }
 
@@ -138,11 +111,13 @@ export default function BestRoster({
 
   return (
     <div>
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-        <Users className="h-4 w-4 text-violet-400" />
-        Best Roster
+      <h2 className="mb-3 flex items-center justify-between gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-violet-400" />
+          Best Roster
+        </div>
         <span className="text-xs font-normal text-zinc-600">
-          highest avg CIR per role · min 3 games
+          AVG CIR - min 3 games
         </span>
       </h2>
 
@@ -172,7 +147,7 @@ export default function BestRoster({
           return (
             <div
               key={role}
-              className="flex items-center gap-4 px-4 py-3 hover:bg-zinc-800/30 transition-colors"
+              className="flex items-center gap-2 md:gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors"
             >
               <span className="w-6 text-center text-base shrink-0">
                 {ROLE_ICONS[role]}
