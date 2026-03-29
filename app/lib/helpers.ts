@@ -1,17 +1,17 @@
 // ─── Re-export barrel ────────────────────────────────────────────────────────
-// helpers.ts is kept as a compatibility shim. Import directly from the
-// split modules for new code:
-//   lib/format.ts        – getParticipant, calcKda, formatKda, calcWinrate, formatWinrate, calcCsPerMin
+// Convenience barrel for commonly used utilities across the app.
+// Import from here for simplicity, or directly from split modules if preferred:
+//   lib/format.ts        – getParticipant, calcKda, formatKda, calcWinrate, formatWinrate, calcCsPerMin, isRemake
 //   lib/aggregation.ts   – aggregatePlayerStats, EMPTY_STATS
 //   lib/ranking.ts       – computeBestOfChallenge
 //   lib/elo.ts           – computeAverageElo, lpToTierLabel, lpToTier
 //   lib/groupMatches.ts  – findGroupMatches
-//   lib/cir.ts           – computeCIR_v1, computeCIR_v2, statsToCircInput
+//   lib/cir.ts           – statsToCircInput
 // ─────────────────────────────────────────────────────────────────────────────
 
 // suppress unused-import lint noise by re-exporting everything
 export type { CIRInput, CIRResult } from "./cir";
-export { computeCIR_v1, computeCIR_v2, statsToCircInput } from "./cir";
+export { statsToCircInput } from "./cir";
 export {
   getParticipant,
   calcKda,

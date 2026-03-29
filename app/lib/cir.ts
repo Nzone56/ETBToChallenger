@@ -1,9 +1,5 @@
 /**
  * Competitive Impact Rating (CIR)
- *
- * Two experimental formulas to measure overall player impact.
- * Use computeCIR_v1 / computeCIR_v2 on averaged stats, then compare
- * which one better reflects perceived performance before picking one.
  */
 
 export interface CIRInput {
@@ -37,75 +33,6 @@ export interface CIRResult {
     economy: number;
     pressure: number;
   };
-}
-
-/**
- * CIR v1
- *
- * Combat   (40%): (K + A×0.7 − D×1.2) × KP/100
- * Utility  (25%): VisionScore×0.5 + DmgToObj×0.0005 + FB%×5
- * Economy  (20%): GoldPerMin×0.02 + CsPerMin×1.5 + GoldLead/100
- * Pressure (15%): DmgPerMin×0.01 + DmgToBuildings×0.0008 + DmgLead/200
- */
-export function computeCIR_v1(input: CIRInput): CIRResult {
-  const kp = input.killParticipation / 100;
-
-  const combat = (input.kills + input.assists * 0.7 - input.deaths * 1.2) * kp;
-
-  const utility =
-    input.visionPerMin * 0.5 +
-    input.dmgToObjectives * 0.0005 +
-    input.firstBloodParticipation * 5;
-
-  const economy =
-    input.goldPerMin * 0.02 + input.csPerMin * 1.5 + input.goldLead / 100;
-
-  const pressure =
-    input.dmgPerMin * 0.01 +
-    input.dmgToBuildings * 0.0008 +
-    input.dmgLead / 200;
-
-  const score = combat * 0.4 + utility * 0.25 + economy * 0.2 + pressure * 0.15;
-
-  return { score, breakdown: { combat, utility, economy, pressure } };
-}
-
-/**
- * CIR v2
- *
- * Combat   (35%): (K + A×0.7 − D×1.3) × (0.5 + KP/100×0.5)
- * Utility  (25%): VisionScore×0.5 + DmgToObj×0.0005 + FB%×3.5
- * Economy  (25%): (GoldPerMin/MaxGPM)×10 + CsPerMin×1.5 + GoldLead/80
- * Pressure (15%): DmgPerMin×0.008 + TeamDmg%×20 + DmgToBuildings×0.0006
- *
- * Requires `maxGameGoldPerMin` and `teamDamagePercent` in input.
- * Falls back gracefully if not provided (uses 1 and 0 respectively).
- */
-export function computeCIR_v2(input: CIRInput): CIRResult {
-  const kp = input.killParticipation / 100;
-  const maxGPM = input.maxGameGoldPerMin ?? 1;
-  const teamDmgPct = input.teamDamagePercent ?? 0;
-
-  const combat =
-    (input.kills + input.assists * 0.7 - input.deaths * 1.2) * (0.5 + kp * 0.5);
-
-  const utility =
-    input.visionPerMin * 0.4 +
-    input.dmgToObjectives * 0.0005 +
-    input.firstBloodParticipation * 3.5;
-
-  const economy =
-    (input.goldPerMin / maxGPM) * 10 +
-    input.csPerMin * 1.5 +
-    input.goldLead / 80;
-
-  const pressure =
-    input.dmgPerMin * 0.008 + teamDmgPct * 20 + input.dmgToBuildings * 0.0006;
-
-  const score =
-    combat * 0.35 + utility * 0.25 + economy * 0.25 + pressure * 0.15;
-
-  return { score, breakdown: { combat, utility, economy, pressure } };
 }
 
 /**
@@ -163,7 +90,7 @@ const ROLE_WEIGHTS: Record<TeamPosition, RoleWeights> = {
   JUNGLE: { combat: 0.3, utility: 0.2, economy: 0.15, pressure: 0.35 },
   MIDDLE: { combat: 0.4, utility: 0.15, economy: 0.25, pressure: 0.2 },
   BOTTOM: { combat: 0.5, utility: 0.05, economy: 0.35, pressure: 0.1 },
-  UTILITY: { combat: 0.15, utility: 0.6, economy: 0.15, pressure: 0.1 },
+  UTILITY: { combat: 0.3, utility: 0.5, economy: 0.15, pressure: 0.05 },
 };
 
 const DEFAULT_WEIGHTS: RoleWeights = {
@@ -178,7 +105,6 @@ export function computeCIR_v3(
 ): CIRResult & { role: string; weights: RoleWeights } {
   const kp = input.killParticipation / 100;
   const maxGPM = input.maxGameGoldPerMin ?? 1;
-  const teamDmgPct = input.teamDamagePercent ?? 0;
 
   const pos = (input.teamPosition?.toUpperCase() ?? "") as TeamPosition;
   const isSupport = pos === "UTILITY";
@@ -201,36 +127,36 @@ export function computeCIR_v3(
   // Support formula: assists-driven, deaths punished, kills near-irrelevant.
   // Others: standard K/D/A formula.  Both multiplied by KP factor.
   const kda_factor = isSupport
-    ? input.kills * 0.3 + input.assists * 0.8 - input.deaths * 0.7
+    ? input.kills * 0.3 + input.assists * 1 - input.deaths * 1
     : input.kills + input.assists * 0.7 - input.deaths * 1.2;
 
   const combat =
-    kda_factor * (0.5 + kp * (isSupport ? 2 : 1)) + // weighted KDA × KP        → ~0–15
-    input.dmgPerMin / 190; // fighting output, 400→2    → ~2–10
+    kda_factor * (0.5 + kp * (isSupport ? 1.75 : 1)) + // weighted KDA × KP        → ~0–15
+    input.dmgPerMin / (isSupport ? 150 : 190); // fighting output, 400→2    → ~2–10
 
   // ── Utility ────────────────────────────────────────────────────────────────
   // KP term rewards roaming supports/junglers who enable kills.
   const utility =
-    input.visionPerMin * (isSupport ? 2 : 3) + // vision/min 0.3→5          → 0.6–10
-    input.dmgToObjectives / (isSupport ? 5000 : 70000) + // obj dmg 20k→800k   → 0.25–10 ✓
-    (input.firstBloodParticipation > 0 ? 2 : 0) + // flat FB bonus  → 0 or 3
-    kp * 5; // kill enablement           → 0–4
+    input.visionPerMin * (isSupport ? 2 : 3.5) + // vision/min 0.3→5          → 0.6–10
+    (isSupport ? kp * 10 : input.dmgToObjectives / 70000 + kp * 5) +
+    (input.firstBloodParticipation > 0 ? 2 : 0); // flat FB bonus  → 0 or 2
 
   // ── Economy ────────────────────────────────────────────────────────────────
   // GPM normalized to max in game. GoldLead capped ±3000 → ±5 pts.
   // Can go negative if gold deficit is severe.
-  const goldLeadCapped = Math.max(-3000, Math.min(3000, input.goldLead));
-  const economy =
-    (input.goldPerMin / maxGPM) * 10 + // relative GPM 0.3–1.0      → 3–10
-    input.csPerMin * 0.8 + // cs/min 4–12                → 3–10
-    goldLeadCapped / 600; // lane lead ±3k              → –5 to +5
+  const goldLeadCapped = Math.max(-5000, Math.min(5000, input.goldLead));
+  const economy = isSupport
+    ? (input.goldPerMin / maxGPM) * 15 + goldLeadCapped / 500 // Ignoramos CS, premiamos eficiencia de oro.
+    : (input.goldPerMin / maxGPM) * 10 +
+      input.csPerMin * 0.8 +
+      goldLeadCapped / 600;
 
   // ── Pressure ───────────────────────────────────────────────────────────────
   // Pure MAP presence: team share + structure damage.
   // DmgLead deficit can make this negative.
   const dmgLeadCapped = Math.max(-5000, Math.min(5000, input.dmgLead));
   const pressure =
-    teamDmgPct / 3 + // team dmg share 15–35%      → 5–12
+    (input.teamDamagePercent ?? 0) / (isSupport ? 1.5 : 2.5) + // team dmg share 15–35%      → 5–12
     input.dmgToBuildings / 5000 +
     (input.goldPerMin / maxGPM) * 5 +
     input.dmgPerMin / 300 + // structure dmg 0–50k         → 0–10
