@@ -19,7 +19,7 @@ export default function RankBadge({
 }: RankBadgeProps) {
   if (!entry) {
     return (
-      <div className={cn("flex items-center gap-2", className)}>
+      <div className={cn("flex items-center gap-1 sm:gap-1", className)}>
         <span className="text-zinc-500 italic">Unranked</span>
       </div>
     );
@@ -32,7 +32,7 @@ export default function RankBadge({
   const sizeStyles = {
     sm: "text-xs gap-1",
     md: "text-sm gap-2",
-    lg: "text-base gap-2",
+    lg: "text-base gap-1 sm:gap-1",
   };
 
   const dotSize = {
@@ -48,14 +48,18 @@ export default function RankBadge({
         style={{ backgroundColor: tierColor }}
       />
       <span
-        className="font-semibold text-zinc-100"
+        className="text-sm sm:text-base font-semibold text-zinc-100"
         style={{ color: tierColor }}
       >
         {entry.tier} {entry.rank}
       </span>
-      {showLp && <span className="text-zinc-400">{entry.leaguePoints} LP</span>}
+      {showLp && (
+        <span className=" text-sm sm:text-base text-zinc-400">
+          {entry.leaguePoints} LP
+        </span>
+      )}
       {showWinrate && (
-        <span className="text-zinc-500">
+        <span className="text-sm sm:text-base text-zinc-500">
           {winrate}% ({total}G)
         </span>
       )}
