@@ -8,6 +8,9 @@ const COLOMBIA_TZ = "America/Bogota"; // GMT-5
  * Format timestamp to Colombian date (e.g., "Jan 15, 2026")
  */
 export function formatColombianDate(timestamp: number): string {
+  if (!timestamp || isNaN(timestamp)) {
+    return "Invalid Date";
+  }
   return new Date(timestamp).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -20,6 +23,9 @@ export function formatColombianDate(timestamp: number): string {
  * Format timestamp to Colombian date without year (e.g., "Jan 15")
  */
 export function formatColombianDateShort(timestamp: number): string {
+  if (!timestamp || isNaN(timestamp)) {
+    return "Invalid Date";
+  }
   return new Date(timestamp).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",

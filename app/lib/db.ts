@@ -1,6 +1,7 @@
 import { createClient, type Client } from "@libsql/client";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
+import { Match } from "../types/riot";
 
 // ─── Turso client (works locally with file: URL and on Vercel with remote URL) ───
 let _client: Client | null = null;
@@ -109,7 +110,7 @@ export const getMatchesByPuuid = cache(
     // Filter for current season + Flex queue
     return res.rows
       .map((r) => JSON.parse(r.data as string))
-      .filter((match: any) => {
+      .filter((match: Match) => {
         return (
           match.info.gameStartTimestamp >= SEASON_START_EPOCH &&
           match.info.queueId === QUEUE_FLEX
@@ -617,6 +618,11 @@ export interface MatchRecord {
     teamDamagePercent: number;
     maxGameGoldPerMin: number;
   };
+  // Delta leaderboards context
+  contextValue?: number; // Team avg CIR or opponent CIR
+  playerCIR?: number; // Player's CIR for delta calculations
+  opponentChampionName?: string; // Lane opponent champion (for king/gap)
+  opponentPosition?: string; // Lane opponent position (for king/gap)
 }
 
 const _getMatchRecords = unstable_cache(
@@ -834,18 +840,255 @@ const _getMatchRecords = unstable_cache(
         .map((r) => ({ ...r, category: `Top CIR ${pos}` })),
     );
 
-    // Worst 10 — ascending sort, take bottom 10
+    // Worst 15 — ascending sort, take bottom 15
     const cirWorstAll = [...cirAll]
       .reverse()
-      .slice(0, 10)
+      .slice(0, 15)
       .map((r) => ({ ...r, category: "Worst CIR" }));
     const cirWorstByPos: MatchRecord[] = positions.flatMap((pos) =>
       cirAll
         .filter((r) => r.teamPosition === pos)
-        .slice(-10)
+        .slice(-15)
         .reverse()
         .map((r) => ({ ...r, category: `Worst CIR ${pos}` })),
     );
+
+    // ── NEW: CIR Delta Leaderboards ──
+    const deltaRecords: MatchRecord[] = [];
+
+    for (const puuid of puuids) {
+      const res = await db.execute({
+        sql: `SELECT m.match_id, m.data, pm.played_at FROM matches m
+              JOIN player_matches pm ON pm.match_id = m.match_id
+              WHERE pm.puuid = ?
+              ORDER BY pm.played_at DESC`,
+        args: [puuid],
+      });
+
+      for (const row of res.rows) {
+        const match = JSON.parse(row.data as string) as Match;
+
+        if (match.info.gameStartTimestamp < SEASON_START_EPOCH) continue;
+        if (match.info.queueId !== QUEUE_FLEX) continue;
+        if (match.info.gameDuration < 300) continue;
+
+        const p = match.info.participants.find((pt) => pt.puuid === puuid);
+        if (!p) continue;
+
+        const durationMin = match.info.gameDuration / 60;
+        if (durationMin <= 0) continue;
+
+        // Calculate player's CIR
+        const { computeCIR_v3 } = await import("../lib/cir");
+        const teamKills = match.info.participants
+          .filter((tp) => tp.teamId === p.teamId)
+          .reduce((s, tp) => s + tp.kills, 0);
+        const kp =
+          teamKills > 0 ? ((p.kills + p.assists) / teamKills) * 100 : 0;
+        const opponent = match.info.participants.find(
+          (op) => op.teamId !== p.teamId && op.teamPosition === p.teamPosition,
+        );
+        const goldLead = opponent ? p.goldEarned - opponent.goldEarned : 0;
+        const dmgLead = opponent
+          ? p.totalDamageDealtToChampions - opponent.totalDamageDealtToChampions
+          : 0;
+        const teamTotalDmg = match.info.participants
+          .filter((tp) => tp.teamId === p.teamId)
+          .reduce((s, tp) => s + tp.totalDamageDealtToChampions, 0);
+        const teamDmgPct =
+          teamTotalDmg > 0
+            ? (p.totalDamageDealtToChampions / teamTotalDmg) * 100
+            : 0;
+        const maxGPM = Math.max(
+          ...match.info.participants.map((pt) => pt.goldEarned / durationMin),
+        );
+
+        const playerCIR = computeCIR_v3({
+          kills: p.kills,
+          deaths: p.deaths,
+          assists: p.assists,
+          killParticipation: kp,
+          visionPerMin: (p.visionScore ?? 0) / durationMin,
+          dmgToObjectives: p.damageDealtToObjectives ?? 0,
+          firstBloodParticipation:
+            p.firstBloodKill || p.firstBloodAssist ? 100 : 0,
+          goldPerMin: p.goldEarned / durationMin,
+          csPerMin:
+            (p.totalMinionsKilled + p.neutralMinionsKilled) / durationMin,
+          goldLead,
+          dmgPerMin: p.totalDamageDealtToChampions / durationMin,
+          dmgToBuildings: p.damageDealtToBuildings ?? 0,
+          dmgLead,
+          teamDamagePercent: teamDmgPct,
+          maxGameGoldPerMin: maxGPM,
+          teamPosition: p.teamPosition,
+        }).score;
+
+        // Calculate team average CIR (excluding player)
+        const teammates = match.info.participants.filter(
+          (tp) => tp.teamId === p.teamId && tp.puuid !== puuid,
+        );
+        let teamCIRSum = 0;
+        for (const tm of teammates) {
+          const tmTeamKills = match.info.participants
+            .filter((tp) => tp.teamId === tm.teamId)
+            .reduce((s, tp) => s + tp.kills, 0);
+          const tmKp =
+            tmTeamKills > 0 ? ((tm.kills + tm.assists) / tmTeamKills) * 100 : 0;
+          const tmOpponent = match.info.participants.find(
+            (op) =>
+              op.teamId !== tm.teamId && op.teamPosition === tm.teamPosition,
+          );
+          const tmGoldLead = tmOpponent
+            ? tm.goldEarned - tmOpponent.goldEarned
+            : 0;
+          const tmDmgLead = tmOpponent
+            ? tm.totalDamageDealtToChampions -
+              tmOpponent.totalDamageDealtToChampions
+            : 0;
+
+          const tmCIR = computeCIR_v3({
+            kills: tm.kills,
+            deaths: tm.deaths,
+            assists: tm.assists,
+            killParticipation: tmKp,
+            visionPerMin: (tm.visionScore ?? 0) / durationMin,
+            dmgToObjectives: tm.damageDealtToObjectives ?? 0,
+            firstBloodParticipation:
+              tm.firstBloodKill || tm.firstBloodAssist ? 100 : 0,
+            goldPerMin: tm.goldEarned / durationMin,
+            csPerMin:
+              (tm.totalMinionsKilled + tm.neutralMinionsKilled) / durationMin,
+            goldLead: tmGoldLead,
+            dmgPerMin: tm.totalDamageDealtToChampions / durationMin,
+            dmgToBuildings: tm.damageDealtToBuildings ?? 0,
+            dmgLead: tmDmgLead,
+            teamDamagePercent:
+              teamTotalDmg > 0
+                ? (tm.totalDamageDealtToChampions / teamTotalDmg) * 100
+                : 0,
+            maxGameGoldPerMin: maxGPM,
+            teamPosition: tm.teamPosition,
+          }).score;
+          teamCIRSum += tmCIR;
+        }
+        const teamAvgCIR =
+          teammates.length > 0 ? teamCIRSum / teammates.length : 0;
+        const teamDelta = playerCIR - teamAvgCIR;
+
+        // Calculate lane opponent CIR delta
+        let laneDelta = 0;
+        let opponentCIR = 0;
+        if (opponent) {
+          const oppTeamKills = match.info.participants
+            .filter((tp) => tp.teamId === opponent.teamId)
+            .reduce((s, tp) => s + tp.kills, 0);
+          const oppKp =
+            oppTeamKills > 0
+              ? ((opponent.kills + opponent.assists) / oppTeamKills) * 100
+              : 0;
+          const oppTeamTotalDmg = match.info.participants
+            .filter((tp) => tp.teamId === opponent.teamId)
+            .reduce((s, tp) => s + tp.totalDamageDealtToChampions, 0);
+          const oppTeamDmgPct =
+            oppTeamTotalDmg > 0
+              ? (opponent.totalDamageDealtToChampions / oppTeamTotalDmg) * 100
+              : 0;
+
+          opponentCIR = computeCIR_v3({
+            kills: opponent.kills,
+            deaths: opponent.deaths,
+            assists: opponent.assists,
+            killParticipation: oppKp,
+            visionPerMin: (opponent.visionScore ?? 0) / durationMin,
+            dmgToObjectives: opponent.damageDealtToObjectives ?? 0,
+            firstBloodParticipation:
+              opponent.firstBloodKill || opponent.firstBloodAssist ? 100 : 0,
+            goldPerMin: opponent.goldEarned / durationMin,
+            csPerMin:
+              (opponent.totalMinionsKilled + opponent.neutralMinionsKilled) /
+              durationMin,
+            goldLead: -goldLead,
+            dmgPerMin: opponent.totalDamageDealtToChampions / durationMin,
+            dmgToBuildings: opponent.damageDealtToBuildings ?? 0,
+            dmgLead: -dmgLead,
+            teamDamagePercent: oppTeamDmgPct,
+            maxGameGoldPerMin: maxGPM,
+            teamPosition: opponent.teamPosition,
+          }).score;
+          laneDelta = playerCIR - opponentCIR;
+        }
+
+        const gameName = p.riotIdGameName ?? puuid;
+        const base = {
+          gameName,
+          puuid,
+          championName: p.championName,
+          playedAt: row.played_at as number,
+          matchId: match.metadata.matchId,
+          win: p.win,
+          kills: p.kills,
+          deaths: p.deaths,
+          assists: p.assists,
+          durationMin,
+          teamPosition: p.teamPosition,
+        };
+
+        // Store delta records with context
+        deltaRecords.push({
+          ...base,
+          category: "1vs9 GOAT",
+          value: teamDelta,
+          contextValue: teamAvgCIR,
+          playerCIR,
+        });
+        deltaRecords.push({
+          ...base,
+          category: "Dead Weight Anchor",
+          value: teamDelta,
+          contextValue: teamAvgCIR,
+          playerCIR,
+        });
+        if (opponent) {
+          deltaRecords.push({
+            ...base,
+            category: "Lane Dominator King",
+            value: laneDelta,
+            contextValue: opponentCIR,
+            playerCIR,
+            opponentChampionName: opponent.championName,
+            opponentPosition: opponent.teamPosition,
+          });
+          deltaRecords.push({
+            ...base,
+            category: "Diffed Gap",
+            value: laneDelta,
+            contextValue: opponentCIR,
+            playerCIR,
+            opponentChampionName: opponent.championName,
+            opponentPosition: opponent.teamPosition,
+          });
+        }
+      }
+    }
+
+    // Extract top 10 for each delta category
+    const titanRecords = deltaRecords
+      .filter((r) => r.category === "1vs9 GOAT")
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+    const anchorRecords = deltaRecords
+      .filter((r) => r.category === "Dead Weight Anchor")
+      .sort((a, b) => a.value - b.value)
+      .slice(0, 10);
+    const kingRecords = deltaRecords
+      .filter((r) => r.category === "Lane Dominator King")
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+    const gapRecords = deltaRecords
+      .filter((r) => r.category === "Diffed Gap")
+      .sort((a, b) => a.value - b.value)
+      .slice(0, 10);
 
     return [
       ...Object.values(best),
@@ -853,6 +1096,10 @@ const _getMatchRecords = unstable_cache(
       ...cirByPos,
       ...cirWorstAll,
       ...cirWorstByPos,
+      ...titanRecords,
+      ...anchorRecords,
+      ...kingRecords,
+      ...gapRecords,
     ];
   },
   ["match-records"],

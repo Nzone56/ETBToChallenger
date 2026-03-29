@@ -2,7 +2,17 @@ import { MatchRecord } from "@/app/lib/db";
 import ChampionIcon from "@/app/components/ui/ChampionIcon";
 import { formatColombianDate } from "@/app/lib/dateUtils";
 import Link from "next/link";
-import { Swords, Skull, Handshake, Zap, Coins, TrendingUp } from "lucide-react";
+import {
+  Swords,
+  Skull,
+  Handshake,
+  Zap,
+  Coins,
+  TrendingUp,
+  Crown,
+  Anchor,
+  TrendingDown,
+} from "lucide-react";
 
 const CATEGORY_META: Record<
   string,
@@ -104,6 +114,34 @@ const CATEGORY_META: Record<
     border: "border-red-900/30",
     format: (v) => `${v >= 0 ? "+" : ""}${Math.round(v).toLocaleString()}`,
     subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game · excl. supp`,
+  },
+  "1vs9 GOAT": {
+    icon: <Crown className="h-4 w-4 text-yellow-400" />,
+    color: "text-yellow-300",
+    border: "border-yellow-500/40",
+    format: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}`,
+    subtitle: () => `CIR Δ vs Team Avg`,
+  },
+  "Lane Dominator King": {
+    icon: <Zap className="h-4 w-4 text-cyan-400" />,
+    color: "text-cyan-300",
+    border: "border-cyan-500/40",
+    format: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}`,
+    subtitle: () => `CIR Δ vs Opponent`,
+  },
+  "Dead Weight Anchor": {
+    icon: <Anchor className="h-4 w-4 text-red-500" />,
+    color: "text-red-400",
+    border: "border-red-900/50",
+    format: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}`,
+    subtitle: () => `CIR Δ vs Team Avg`,
+  },
+  "Diffed Gap": {
+    icon: <TrendingDown className="h-4 w-4 text-orange-500" />,
+    color: "text-orange-400",
+    border: "border-orange-900/50",
+    format: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}`,
+    subtitle: () => `CIR Δ vs Opponent`,
   },
 };
 
