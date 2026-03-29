@@ -11,12 +11,25 @@ export async function getChampionSkinUrl(
   try {
     const res = await fetch(
       `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion/${championName}.json`,
-      { next: { revalidate: 86400 } },
+      {
+        next: { revalidate: 604800 }, // 7 days - DDragon data is stable
+        cache: "force-cache", // Aggressive caching for production stability
+      },
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(
+        `[skinUtils] Failed to fetch champion data for ${championName}: ${res.status}`,
+      );
+      return null;
+    }
     const data = await res.json();
     const skins: { num: number; name: string }[] =
       data?.data?.[championName]?.skins ?? [];
+
+    if (skins.length === 0) {
+      console.warn(`[skinUtils] No skins found for ${championName}`);
+      return null;
+    }
 
     let chosen: { num: number; name: string } | undefined;
 
@@ -32,9 +45,16 @@ export async function getChampionSkinUrl(
           : skins[0];
     }
 
-    if (!chosen) return null;
+    if (!chosen) {
+      console.warn(`[skinUtils] No valid skin chosen for ${championName}`);
+      return null;
+    }
     return `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${championName}_${chosen.num}.jpg`;
-  } catch {
+  } catch (error) {
+    console.error(
+      `[skinUtils] Error fetching skin for ${championName}:`,
+      error,
+    );
     return null;
   }
 }

@@ -1,7 +1,8 @@
 import { MatchRecord } from "@/app/lib/db";
-import { Swords, Skull, Handshake, Zap, Coins, TrendingUp } from "lucide-react";
-import ChampionIcon from "../ui/ChampionIcon";
+import ChampionIcon from "@/app/components/ui/ChampionIcon";
+import { formatColombianDate } from "@/app/lib/dateUtils";
 import Link from "next/link";
+import { Swords, Skull, Handshake, Zap, Coins, TrendingUp } from "lucide-react";
 
 const CATEGORY_META: Record<
   string,
@@ -114,11 +115,7 @@ function RecordCard({
   version: string;
 }) {
   const meta = CATEGORY_META[record.category];
-  const date = new Date(record.playedAt).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const date = formatColombianDate(record.playedAt);
 
   return (
     <Link

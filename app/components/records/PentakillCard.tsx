@@ -1,5 +1,6 @@
 import { PentakillEvent } from "@/app/lib/db";
-import ChampionIcon from "../ui/ChampionIcon";
+import ChampionIcon from "@/app/components/ui/ChampionIcon";
+import { formatColombianDate } from "@/app/lib/dateUtils";
 import { Star } from "lucide-react";
 import Link from "next/link";
 
@@ -10,11 +11,7 @@ function PentakillCard({
   event: PentakillEvent;
   version: string;
 }) {
-  const date = new Date(event.playedAt).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const date = formatColombianDate(event.playedAt);
 
   return (
     <Link

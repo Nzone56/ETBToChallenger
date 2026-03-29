@@ -1,5 +1,6 @@
 import { Match, MatchParticipant } from "@/app/types/riot";
 import { Trophy, Clock, Calendar, Users, RefreshCw } from "lucide-react";
+import { formatColombianDate, formatColombianTime } from "@/app/lib/dateUtils";
 import { isRemake } from "@/app/lib/format";
 
 interface MatchHeaderProps {
@@ -13,21 +14,8 @@ export default function MatchHeader({
 }: MatchHeaderProps) {
   const duration = Math.floor(match.info.gameDuration / 60);
   const durationSec = match.info.gameDuration % 60;
-  const date = new Date(match.info.gameStartTimestamp).toLocaleDateString(
-    "en-US",
-    {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    },
-  );
-  const time = new Date(match.info.gameStartTimestamp).toLocaleTimeString(
-    "en-US",
-    {
-      hour: "2-digit",
-      minute: "2-digit",
-    },
-  );
+  const date = formatColombianDate(match.info.gameStartTimestamp);
+  const time = formatColombianTime(match.info.gameStartTimestamp);
 
   const team100 = match.info.teams.find((t) => t.teamId === 100);
   const team200 = match.info.teams.find((t) => t.teamId === 200);

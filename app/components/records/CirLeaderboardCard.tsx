@@ -6,6 +6,7 @@ import ChampionIcon from "../ui/ChampionIcon";
 import { cirLabel, PILLARS, POSITION_LABELS, RAW_STATS } from "./RecordData";
 import { ChevronDown, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { formatColombianDateShort } from "@/app/lib/dateUtils";
 
 function CirLeaderboardCard({
   record,
@@ -19,10 +20,7 @@ function CirLeaderboardCard({
   const [open, setOpen] = useState(false);
 
   const { label, color } = cirLabel(record.value);
-  const date = new Date(record.playedAt).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
+  const date = formatColombianDateShort(record.playedAt);
   const pos = record.teamPosition ?? "";
   const posLabel = POSITION_LABELS[pos] ?? pos;
   const bd = record.cirBreakdown;
