@@ -61,7 +61,7 @@ export default async function MatchPage({ params }: MatchPageProps) {
     match.info.teams.find((t) => t.teamId === 200)?.win ?? false;
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-6xl px-4 py-4 ">
       <div className="animate-fade-in">
         <GoBackButton />
       </div>

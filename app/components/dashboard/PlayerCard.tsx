@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PlayerDashboardData } from "@/app/types/riot";
+import { PlayerDashboardData, PlayerAggregatedStats } from "@/app/types/riot";
 import {
   getParticipant,
   calcKda,
@@ -102,10 +102,15 @@ function CirBadge({ score }: { score: number }) {
 
 interface PlayerCardProps {
   player: PlayerDashboardData;
+  stats: PlayerAggregatedStats;
   version: string;
 }
 
-export default function PlayerCard({ player, version }: PlayerCardProps) {
+export default function PlayerCard({
+  player,
+  stats,
+  version,
+}: PlayerCardProps) {
   const lastMatchParticipant = player.lastMatch
     ? getParticipant(player.lastMatch, player.puuid)
     : null;
@@ -173,10 +178,7 @@ export default function PlayerCard({ player, version }: PlayerCardProps) {
     };
   })();
 
-  const total = player.flexEntry
-    ? player.flexEntry.wins + player.flexEntry.losses
-    : 0;
-  const winrate = player.flexEntry ? (player.flexEntry.wins / total) * 100 : 0;
+  const winrate = stats.winrate;
   const lp = player.flexEntry
     ? rankToLp(
         player.flexEntry.tier,
@@ -218,12 +220,12 @@ export default function PlayerCard({ player, version }: PlayerCardProps) {
         </div>
 
         {/* Stats row */}
-        {player.flexEntry && (
+        {stats.totalGames > 0 && (
           <div className="mt-3 flex items-center gap-4">
             <div className="flex-1">
               <WinrateBar
-                wins={player.flexEntry.wins}
-                losses={player.flexEntry.losses}
+                wins={stats.wins}
+                losses={stats.totalGames - stats.wins}
               />
             </div>
             <div className="text-right shrink-0">
@@ -231,7 +233,7 @@ export default function PlayerCard({ player, version }: PlayerCardProps) {
                 {formatWinrate(winrate)}
               </div>
               <div className="text-xs text-zinc-500">
-                {player.flexEntry.wins}W {player.flexEntry.losses}L
+                {stats.wins}W {stats.totalGames - stats.wins}L
               </div>
             </div>
           </div>
