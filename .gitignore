@@ -42,3 +42,6 @@ next-env.d.ts
 
 # SQLite cache DB (generated at runtime)
 /data/
+
+# Claude documentation
+Claude.md

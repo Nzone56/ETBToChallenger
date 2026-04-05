@@ -580,6 +580,194 @@ export const getGroupMatches = cache(
   },
 );
 
+export interface PlayerStackStats {
+  puuid: string;
+  soloGames: number;
+  soloWins: number;
+  duoGames: number;
+  duoWins: number;
+  trioGames: number;
+  trioWins: number;
+  pentaGames: number;
+  pentaWins: number;
+}
+
+const _getPlayerStackStats = unstable_cache(
+  async (puuids: string[]): Promise<PlayerStackStats[]> => {
+    await ensureSchema();
+    const db = getDb();
+
+    // Get all group matches
+    const groupRes = await db.execute(
+      "SELECT match_data, player_list FROM group_matches",
+    );
+
+    // Build map of match_id -> player count for group matches
+    const groupMatchMap = new Map<string, number>();
+    for (const row of groupRes.rows) {
+      const match = JSON.parse(row.match_data as string) as SlimGroupMatch;
+      const players = JSON.parse(row.player_list as string) as {
+        puuid: string;
+        gameName: string;
+      }[];
+      groupMatchMap.set(match.metadata.matchId, players.length);
+    }
+
+    // Initialize stats for each player
+    const statsMap = new Map<string, PlayerStackStats>();
+    for (const puuid of puuids) {
+      statsMap.set(puuid, {
+        puuid,
+        soloGames: 0,
+        soloWins: 0,
+        duoGames: 0,
+        duoWins: 0,
+        trioGames: 0,
+        trioWins: 0,
+        pentaGames: 0,
+        pentaWins: 0,
+      });
+    }
+
+    // Get all matches for each player and categorize by stack size
+    for (const puuid of puuids) {
+      const matchRes = await db.execute({
+        sql: `SELECT DISTINCT m.match_id, m.data FROM matches m
+              JOIN player_matches pm ON pm.match_id = m.match_id
+              WHERE pm.puuid = ?
+              ORDER BY pm.played_at DESC`,
+        args: [puuid],
+      });
+
+      const stats = statsMap.get(puuid)!;
+
+      for (const row of matchRes.rows) {
+        const match = JSON.parse(row.data as string) as Match;
+
+        // Filter for current season + Flex queue + exclude remakes
+        const { SEASON_START_EPOCH, QUEUE_FLEX } =
+          await import("../data/constants");
+        const { isRemake } = await import("./helpers");
+        if (
+          match.info.gameStartTimestamp < SEASON_START_EPOCH ||
+          match.info.queueId !== QUEUE_FLEX ||
+          isRemake(match.info.gameDuration)
+        ) {
+          continue;
+        }
+
+        const matchId = match.metadata.matchId;
+        const stackSize = groupMatchMap.get(matchId) ?? 1; // Default to solo if not in group_matches
+        const participant = match.info.participants.find(
+          (p) => p.puuid === puuid,
+        );
+        if (!participant) continue;
+
+        const won = participant.win;
+
+        if (stackSize === 1) {
+          stats.soloGames++;
+          if (won) stats.soloWins++;
+        } else if (stackSize === 2) {
+          stats.duoGames++;
+          if (won) stats.duoWins++;
+        } else if (stackSize === 3) {
+          stats.trioGames++;
+          if (won) stats.trioWins++;
+        } else if (stackSize >= 4) {
+          // 4 or 5 person groups
+          stats.pentaGames++;
+          if (won) stats.pentaWins++;
+        }
+      }
+    }
+
+    return Array.from(statsMap.values());
+  },
+  ["player-stack-stats"],
+  { tags: [DB_TAG], revalidate: 900 },
+);
+
+export async function getPlayerStackStats(
+  puuids: string[],
+): Promise<PlayerStackStats[]> {
+  return _getPlayerStackStats(puuids);
+}
+
+// Get combined role + stack stats for a specific player
+export async function getPlayerRoleStackStats(
+  puuid: string,
+  role: string,
+  stackSize: number,
+): Promise<{ games: number; wins: number }> {
+  await ensureSchema();
+  const db = getDb();
+
+  // Get all group matches to determine stack sizes
+  const groupRes = await db.execute(
+    "SELECT match_data, player_list FROM group_matches",
+  );
+
+  const groupMatchMap = new Map<string, number>();
+  for (const row of groupRes.rows) {
+    const match = JSON.parse(row.match_data as string) as SlimGroupMatch;
+    const players = JSON.parse(row.player_list as string) as {
+      puuid: string;
+      gameName: string;
+    }[];
+    groupMatchMap.set(match.metadata.matchId, players.length);
+  }
+
+  // Get all matches for the player
+  const matchRes = await db.execute({
+    sql: `SELECT m.match_id, m.data FROM matches m
+          JOIN player_matches pm ON pm.match_id = m.match_id
+          WHERE pm.puuid = ?
+          ORDER BY pm.played_at DESC`,
+    args: [puuid],
+  });
+
+  let games = 0;
+  let wins = 0;
+
+  for (const row of matchRes.rows) {
+    const match = JSON.parse(row.data as string) as Match;
+
+    // Filter for current season + Flex queue
+    const { SEASON_START_EPOCH, QUEUE_FLEX } =
+      await import("../data/constants");
+    if (
+      match.info.gameStartTimestamp < SEASON_START_EPOCH ||
+      match.info.queueId !== QUEUE_FLEX
+    ) {
+      continue;
+    }
+
+    const matchId = match.metadata.matchId;
+    const matchStackSize = groupMatchMap.get(matchId) ?? 1;
+
+    // Check if stack size matches
+    let stackMatches = false;
+    if (stackSize === 1 && matchStackSize === 1) stackMatches = true;
+    else if (stackSize === 2 && matchStackSize === 2) stackMatches = true;
+    else if (stackSize === 3 && matchStackSize === 3) stackMatches = true;
+    else if (stackSize >= 4 && matchStackSize >= 4) stackMatches = true;
+
+    if (!stackMatches) continue;
+
+    const participant = match.info.participants.find((p) => p.puuid === puuid);
+    if (!participant) continue;
+
+    // Check if role matches
+    if (participant.teamPosition !== role) continue;
+
+    games++;
+    if (participant.win) wins++;
+  }
+
+  return { games, wins };
+}
+
 // ─── Match Records ───
 
 export interface MatchRecord {

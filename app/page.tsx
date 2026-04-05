@@ -6,6 +6,7 @@ import {
   getLatestSyncedAt,
   getCirRoleAverages,
   getLoneWolfStats,
+  getPlayerStackStats,
 } from "./lib/db";
 import {
   computeAverageElo,
@@ -26,7 +27,6 @@ import ChallengeHeader from "./components/dashboard/ChallengeHeader";
 import Leaderboard from "./components/dashboard/Leaderboard";
 import PlayerCard from "./components/dashboard/PlayerCard";
 import BestOfSection from "./components/dashboard/BestOfSection";
-import RoleLeaderboard from "./components/dashboard/RoleLeaderboard";
 import RoleCirLeaderboard from "./components/dashboard/RoleCirLeaderboard";
 import LoneWolf from "./components/dashboard/LoneWolf";
 import SyncTrigger from "./components/SyncTrigger";
@@ -42,6 +42,7 @@ export default async function Home() {
     lastMatches,
     cirRoleAverages,
     loneWolfStats,
+    stackStats,
     version,
     syncedAt,
   ] = await Promise.all([
@@ -50,6 +51,7 @@ export default async function Home() {
     Promise.all(users.map((u) => getLastMatchByPuuid(u.puuid))),
     getCirRoleAverages(puuids),
     getLoneWolfStats(puuids),
+    getPlayerStackStats(puuids),
     getDdragonVersion(),
     getLatestSyncedAt(),
   ]);
@@ -166,9 +168,17 @@ export default async function Home() {
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="lg:col-span-1 space-y-4">
-                <Leaderboard players={dashboardData} version={version} />
+                <Leaderboard
+                  players={dashboardData.map((p) => ({
+                    ...p,
+                    stats: statsMap.get(p.puuid)
+                      ? JSON.parse(statsMap.get(p.puuid)!.statsJson)
+                      : EMPTY_STATS,
+                  }))}
+                  stackStats={stackStats}
+                  version={version}
+                />
                 <LoneWolf entries={enrichedLoneWolfStats} version={version} />
-                <RoleLeaderboard players={playerStatsData} version={version} />
                 <RoleCirLeaderboard
                   entries={cirRoleAverages}
                   players={playerStatsData.map((p) => ({
@@ -183,13 +193,19 @@ export default async function Home() {
                   Player Cards
                 </h2>
                 <div className="grid grid-cols-1 gap-3 stagger-grid">
-                  {dashboardData.map((player) => (
-                    <PlayerCard
-                      key={player.puuid}
-                      player={player}
-                      version={version}
-                    />
-                  ))}
+                  {dashboardData.map((player) => {
+                    const playerStats = statsMap.get(player.puuid)
+                      ? JSON.parse(statsMap.get(player.puuid)!.statsJson)
+                      : EMPTY_STATS;
+                    return (
+                      <PlayerCard
+                        key={player.puuid}
+                        player={player}
+                        stats={playerStats}
+                        version={version}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             </div>

@@ -14,6 +14,7 @@ import {
   getCirTierLetter,
   getCirBgColor,
 } from "@/app/lib/cirUtils";
+import { formatColombianDateShort } from "@/app/lib/dateUtils";
 import { POSITION_LABELS } from "@/app/data/constants";
 import ChampionIcon from "@/app/components/ui/ChampionIcon";
 import KdaDisplay from "@/app/components/ui/KdaDisplay";
@@ -540,12 +541,18 @@ export default function MatchHistoryList({
                   <div className="text-[10px] text-zinc-600">DMG</div>
                 </div>
 
-                {/* Duration */}
-                <div className="hidden text-center sm:block w-14 shrink-0">
-                  <div className="text-sm font-semibold tabular-nums text-zinc-400">
-                    {durationMin}:{String(durationSec).padStart(2, "0")}
+                {/* Duration + damage + date */}
+                <div className="flex flex-col items-end gap-0.5 shrink-0">
+                  <div className="flex items-center gap-1 text-xs text-zinc-500">
+                    <Clock className="h-3 w-3" />
+                    <span>
+                      {durationMin}:{durationSec.toString().padStart(2, "0")}
+                    </span>
                   </div>
-                  <div className="text-[10px] text-zinc-600">TIME</div>
+                  <span className="text-xs text-zinc-600">{dmg} DMG</span>
+                  <span className="text-xs text-zinc-700">
+                    {formatColombianDateShort(match.info.gameStartTimestamp)}
+                  </span>
                 </div>
 
                 {/* CIR badge / Remake badge */}
