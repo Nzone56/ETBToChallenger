@@ -16,6 +16,7 @@ import InternalRankings from "@/app/components/team/InternalRankings";
 import FinalRankings from "@/app/components/team/FinalRankings";
 import BestRoster from "@/app/components/team/BestRoster";
 import GroupMatchHistory from "@/app/components/team/GroupMatchHistory";
+import TeamAnalyticsTabs from "@/app/components/team/TeamAnalyticsTabs";
 import SyncTrigger from "@/app/components/SyncTrigger";
 
 export const revalidate = 900;
@@ -80,32 +81,35 @@ export default async function TeamPage() {
           </p>
         </div>
 
-        {/* Team Overview Stats */}
-        <TeamOverview
-          players={playerStatsData}
-          totalGroupMatches={groupMatchCount}
-          groupWins={groupWins}
-          version={version}
-        />
+        {/* Tab Switcher for Team Analytics vs Rukawa Files */}
+        <TeamAnalyticsTabs>
+          {/* Team Overview Stats */}
+          <TeamOverview
+            players={playerStatsData}
+            totalGroupMatches={groupMatchCount}
+            groupWins={groupWins}
+            version={version}
+          />
 
-        {/* Best Roster — highest avg CIR per role */}
-        <BestRoster
-          entries={cirRoleAverages}
-          players={playerStatsData.map((p) => ({
-            gameName: p.gameName,
-            profileIconId: p.profileIconId,
-          }))}
-          version={version}
-        />
+          {/* Best Roster — highest avg CIR per role */}
+          <BestRoster
+            entries={cirRoleAverages}
+            players={playerStatsData.map((p) => ({
+              gameName: p.gameName,
+              profileIconId: p.profileIconId,
+            }))}
+            version={version}
+          />
 
-        {/* Final Rankings — avg position across all stat categories */}
-        <FinalRankings players={playerStatsData} version={version} />
+          {/* Final Rankings — avg position across all stat categories */}
+          <FinalRankings players={playerStatsData} version={version} />
 
-        {/* Internal Rankings (client component for sorting) */}
-        <InternalRankings players={playerStatsData} version={version} />
+          {/* Internal Rankings (client component for sorting) */}
+          <InternalRankings players={playerStatsData} version={version} />
 
-        {/* Group Match History — fetches its own data client-side */}
-        <GroupMatchHistory />
+          {/* Group Match History — fetches its own data client-side */}
+          <GroupMatchHistory />
+        </TeamAnalyticsTabs>
       </div>
     </main>
   );
