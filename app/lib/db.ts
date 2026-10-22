@@ -18,39 +18,56 @@ export function getDb(): Client {
   return _client;
 }
 
-/** Matches per Turso response when reading full match JSON. */
-const MATCH_PAGE_SIZE = 40;
+/** Slim matches per Turso response. */
+const MATCH_CHUNK = 50;
 
 /**
- * `db.execute` for queries that return full match JSON, fetched in pages.
+ * `db.execute` for queries that select `m.data` from `match_slim m`, run in
+ * two light steps so Turso never sorts or ships a season of JSON at once:
  *
- * A Riot match is tens of KB; a season of them in one response exceeds
- * Turso's per-response memory ("Resource exhausted: mem_hrana_response") and
- * the request fails. Paging keeps each response small and returns the same
- * rows. The SQL must have a deterministic ORDER BY (ties broken by match_id)
- * and no LIMIT of its own.
+ *  1. the query itself with `m.data` swapped for the match id — ordering,
+ *     filtering and DISTINCT happen on ids only;
+ *  2. the JSON, fetched by id in chunks of MATCH_CHUNK.
+ *
+ * Rows come back in the query's order with the same columns. One unbounded
+ * response failed with "Resource exhausted: mem_hrana_response"; paging with
+ * ORDER BY/OFFSET re-sorted the blobs every page and hit SQLITE_NOMEM.
  */
 export async function executePaged(
   db: Client,
   stmt: { sql: string; args?: InValue[] },
-  pageSize = MATCH_PAGE_SIZE,
 ): Promise<{ rows: Row[] }> {
-  const rows: Row[] = [];
-  for (let offset = 0; ; offset += pageSize) {
+  const light = await db.execute({
+    sql: stmt.sql.replace(/\bm\.data\b/, "m.match_id AS _mid"),
+    args: stmt.args ?? [],
+  });
+  const ids = [...new Set(light.rows.map((r) => r._mid as string))];
+
+  const data = new Map<string, unknown>();
+  for (let i = 0; i < ids.length; i += MATCH_CHUNK) {
+    const chunk = ids.slice(i, i + MATCH_CHUNK);
     const res = await db.execute({
-      sql: `${stmt.sql} LIMIT ? OFFSET ?`,
-      args: [...(stmt.args ?? []), pageSize, offset],
+      sql: `SELECT match_id, data FROM match_slim WHERE match_id IN (${chunk.map(() => "?").join(",")})`,
+      args: chunk,
     });
-    rows.push(...res.rows);
-    if (res.rows.length < pageSize) return { rows };
+    for (const r of res.rows) data.set(r.match_id as string, r.data);
   }
+
+  return {
+    rows: light.rows.map((r) => ({ ...r, data: data.get(r._mid as string) }) as unknown as Row),
+  };
 }
 
 // Returns a promise that resolves once the schema is ready.
 // Safe to call concurrently — only runs once per process.
 export function ensureSchema(): Promise<void> {
   if (_schemaReady) return _schemaReady;
-  _schemaReady = initSchema();
+  // A failed init is forgotten so the next call retries, instead of every
+  // request in this instance failing on the cached rejection.
+  _schemaReady = initSchema().catch((err) => {
+    _schemaReady = null;
+    throw err;
+  });
   return _schemaReady;
 }
 
@@ -97,7 +114,88 @@ export async function initSchema(): Promise<void> {
       played_at   INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_group_matches_played ON group_matches(played_at);
+    CREATE TABLE IF NOT EXISTS match_slim (
+      match_id TEXT PRIMARY KEY,
+      data     TEXT NOT NULL
+    );
   `);
+  await refreshMatchSlim();
+}
+
+// ─── Slim matches ───
+//
+// A stored Riot match is ~78 KB, 97% of it participant fields the app never
+// reads (`challenges` alone is 3.5 KB per player). Every season-wide read
+// goes through `match_slim` instead: the same JSON shape with only the fields
+// in our `Match` type (~10× smaller), so a cold cache loads in seconds, not
+// minutes. It's built entirely inside Turso — nothing large crosses the wire.
+
+const SLIM_PARTICIPANT_FIELDS = [
+  "puuid", "summonerName", "riotIdGameName", "riotIdTagline",
+  "championId", "championName", "champLevel", "teamId", "teamPosition",
+  "individualPosition", "role", "win", "kills", "deaths", "assists",
+  "totalDamageDealtToChampions", "totalDamageTaken", "totalMinionsKilled",
+  "neutralMinionsKilled", "visionScore", "wardsPlaced", "wardsKilled",
+  "goldEarned", "goldSpent", "item0", "item1", "item2", "item3", "item4",
+  "item5", "item6", "summoner1Id", "summoner2Id", "doubleKills",
+  "tripleKills", "quadraKills", "pentaKills", "firstBloodKill",
+  "firstBloodAssist", "damageDealtToBuildings", "damageDealtToObjectives",
+  "turretKills", "inhibitorKills",
+];
+
+const SLIM_INFO_FIELDS = [
+  "gameCreation", "gameDuration", "gameEndTimestamp", "gameId", "gameMode",
+  "gameStartTimestamp", "gameType", "gameVersion", "mapId", "platformId",
+  "queueId", "teams",
+];
+
+// `json(x -> '$.f')` copies a value as JSON, so booleans stay booleans.
+const pick = (src: string, fields: string[]) =>
+  fields.map((f) => `'${f}', json(${src} -> '$.${f}')`).join(", ");
+
+// Matches per INSERT. Each one parses full match JSON inside Turso; 100 at a
+// time ran it out of memory (SQLITE_NOMEM), so stay small and halve on error.
+const SLIM_BATCH = 25;
+
+const slimInsert = (batch: number) => `
+  INSERT INTO match_slim (match_id, data)
+  SELECT m.match_id, json_object(
+    'metadata', json_object('matchId', m.match_id),
+    'info', json_object(
+      ${pick("(m.data -> '$.info')", SLIM_INFO_FIELDS)},
+      'participants', json((
+        SELECT json_group_array(json_object(${pick("p.value", SLIM_PARTICIPANT_FIELDS)}))
+        FROM json_each(m.data, '$.info.participants') p
+      ))
+    )
+  )
+  FROM matches m
+  WHERE m.match_id NOT IN (SELECT match_id FROM match_slim)
+  LIMIT ${batch}`;
+
+/**
+ * Build slim copies for any match that doesn't have one yet. Idempotent, and
+ * never throws: a failure is logged and retried on the next call, so it can't
+ * take schema setup (and every page) down with it.
+ */
+export async function refreshMatchSlim(): Promise<number> {
+  const db = getDb();
+  let added = 0;
+  let batch = SLIM_BATCH;
+  for (;;) {
+    try {
+      const res = await db.execute(slimInsert(batch));
+      added += res.rowsAffected;
+      if (res.rowsAffected < batch) return added;
+    } catch (err) {
+      if (batch > 1) {
+        batch = Math.max(1, Math.floor(batch / 2));
+        continue;
+      }
+      console.error("[match_slim] backfill failed:", err);
+      return added;
+    }
+  }
 }
 
 // ─── Match helpers ───
@@ -129,7 +227,7 @@ export const getMatchesByPuuid = cache(
     const { SEASON_START_EPOCH, QUEUE_FLEX } =
       await import("../data/constants");
     const res = await executePaged(db, {
-      sql: `SELECT m.data FROM matches m
+      sql: `SELECT m.data FROM match_slim m
           JOIN player_matches pm ON pm.match_id = m.match_id
           WHERE pm.puuid = ?
           ORDER BY pm.played_at DESC, m.match_id`,
@@ -154,7 +252,7 @@ const _getMatchesByPuuidPaged = unstable_cache(
     await ensureSchema();
     const db = getDb();
     const res = await db.execute({
-      sql: `SELECT m.data FROM matches m
+      sql: `SELECT m.data FROM match_slim m
             JOIN player_matches pm ON pm.match_id = m.match_id
             WHERE pm.puuid = ?
             ORDER BY pm.played_at DESC
@@ -178,7 +276,7 @@ const _getLastMatchByPuuid = unstable_cache(
     await ensureSchema();
     const db = getDb();
     const res = await db.execute({
-      sql: `SELECT m.data FROM matches m
+      sql: `SELECT m.data FROM match_slim m
             JOIN player_matches pm ON pm.match_id = m.match_id
             WHERE pm.puuid = ?
             ORDER BY pm.played_at DESC
@@ -230,7 +328,7 @@ const _getPentakillEvents = unstable_cache(
     const events: PentakillEvent[] = [];
     for (const puuid of puuids) {
       const res = await executePaged(db, {
-        sql: `SELECT m.match_id, m.data, pm.played_at FROM matches m
+        sql: `SELECT m.match_id, m.data, pm.played_at FROM match_slim m
               JOIN player_matches pm ON pm.match_id = m.match_id
               WHERE pm.puuid = ?
               ORDER BY pm.played_at DESC, m.match_id`,
@@ -290,6 +388,7 @@ export async function storeMatches(
     args: [m.matchId, JSON.stringify(m.data), now],
   }));
   await db.batch(stmts, "write");
+  await refreshMatchSlim();
 }
 
 export async function storePlayerMatchLinks(
@@ -660,7 +759,7 @@ const _getPlayerStackStats = unstable_cache(
     // Get all matches for each player and categorize by stack size
     for (const puuid of puuids) {
       const matchRes = await executePaged(db, {
-        sql: `SELECT DISTINCT m.match_id, m.data FROM matches m
+        sql: `SELECT DISTINCT m.match_id, m.data FROM match_slim m
               JOIN player_matches pm ON pm.match_id = m.match_id
               WHERE pm.puuid = ?
               ORDER BY pm.played_at DESC, m.match_id`,
@@ -748,7 +847,7 @@ export async function getPlayerRoleStackStats(
 
   // Get all matches for the player
   const matchRes = await executePaged(db, {
-    sql: `SELECT m.match_id, m.data FROM matches m
+    sql: `SELECT m.match_id, m.data FROM match_slim m
           JOIN player_matches pm ON pm.match_id = m.match_id
           WHERE pm.puuid = ?
           ORDER BY pm.played_at DESC, m.match_id`,
@@ -868,7 +967,7 @@ const _getMatchRecords = unstable_cache(
 
     for (const puuid of puuids) {
       const res = await executePaged(db, {
-        sql: `SELECT m.match_id, m.data, pm.played_at FROM matches m
+        sql: `SELECT m.match_id, m.data, pm.played_at FROM match_slim m
               JOIN player_matches pm ON pm.match_id = m.match_id
               WHERE pm.puuid = ?
               ORDER BY pm.played_at DESC, m.match_id`,
@@ -1074,7 +1173,7 @@ const _getMatchRecords = unstable_cache(
 
     for (const puuid of puuids) {
       const res = await executePaged(db, {
-        sql: `SELECT m.match_id, m.data, pm.played_at FROM matches m
+        sql: `SELECT m.match_id, m.data, pm.played_at FROM match_slim m
               JOIN player_matches pm ON pm.match_id = m.match_id
               WHERE pm.puuid = ?
               ORDER BY pm.played_at DESC, m.match_id`,
@@ -1354,7 +1453,7 @@ const _getCirRoleAverages = unstable_cache(
 
     for (const puuid of puuids) {
       const res = await executePaged(db, {
-        sql: `SELECT m.match_id, m.data, pm.played_at FROM matches m
+        sql: `SELECT m.match_id, m.data, pm.played_at FROM match_slim m
               JOIN player_matches pm ON pm.match_id = m.match_id
               WHERE pm.puuid = ?
               ORDER BY pm.played_at DESC, m.match_id`,
@@ -1510,7 +1609,7 @@ const _getLoneWolfStats = unstable_cache(
               json_extract(m.data, '$.info.gameStartTimestamp') AS started,
               json_extract(m.data, '$.info.queueId') AS queue
        FROM player_matches pm
-       JOIN matches m ON m.match_id = pm.match_id
+       JOIN match_slim m ON m.match_id = pm.match_id
        WHERE pm.puuid IN (${puuids.map(() => "?").join(",")})`,
       puuids,
     );

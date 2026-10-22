@@ -67,8 +67,15 @@ Riot API ──▶ lib/sync.ts ──▶ Turso ──▶ lib/db.ts (unstable_cac
   its heavy reads one at a time. When a query only needs a few fields, let
   Turso extract them (`json_extract(m.data, '$.info.gameDuration')`) instead
   of returning whole match JSON — see `getLoneWolfStats`. Don't add another
-  "read every match" query without caching it, and read full match JSON only
-  through `executePaged` (`lib/db.ts`) — one unbounded response is what fails.
+  "read every match" query without caching it.
+- **Season-wide reads use `match_slim`, never `matches`.** A stored match is
+  ~78 KB; `match_slim` holds the same JSON with only the fields in our
+  `Match` type (~10 KB). It's built inside Turso (`refreshMatchSlim`, run on
+  schema init and after every `storeMatches`) — add a field to
+  `SLIM_PARTICIPANT_FIELDS` / `SLIM_INFO_FIELDS` before reading it, then
+  `DELETE FROM match_slim` so it rebuilds. Read it through `executePaged`
+  (ids first, JSON in chunks). Only the single-match page reads `matches`.
+  Cold loads went from ~5 min to ~15 s.
 
 ### Folders
 

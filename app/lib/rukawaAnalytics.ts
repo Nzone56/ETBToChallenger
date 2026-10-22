@@ -86,7 +86,7 @@ async function computeRukawaAnalytics(): Promise<RukawaAnalytics> {
 
   // Get all Rukawa's matches
   const rukawaMatchesRes = await executePaged(db, {
-    sql: `SELECT DISTINCT m.match_id, m.data FROM matches m
+    sql: `SELECT DISTINCT m.match_id, m.data FROM match_slim m
           JOIN player_matches pm ON pm.match_id = m.match_id
           WHERE pm.puuid = ?
           ORDER BY pm.played_at DESC, m.match_id`,
@@ -423,7 +423,7 @@ async function computeRukawaAnalytics(): Promise<RukawaAnalytics> {
   // Get CIR without Rukawa for each teammate
   for (const teammate of teammates) {
     const teammateMatchesRes = await executePaged(db, {
-      sql: `SELECT DISTINCT m.match_id, m.data FROM matches m
+      sql: `SELECT DISTINCT m.match_id, m.data FROM match_slim m
             JOIN player_matches pm ON pm.match_id = m.match_id
             WHERE pm.puuid = ?
             ORDER BY pm.played_at DESC, m.match_id`,

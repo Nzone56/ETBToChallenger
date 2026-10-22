@@ -126,7 +126,7 @@ async function computeAwardsData(): Promise<AwardsData> {
     pickBuckets.set(user.puuid, pickMap);
 
     const res = await executePaged(db, {
-      sql: `SELECT DISTINCT m.match_id, m.data FROM matches m
+      sql: `SELECT DISTINCT m.match_id, m.data FROM match_slim m
             JOIN player_matches pm ON pm.match_id = m.match_id
             WHERE pm.puuid = ?
             ORDER BY m.match_id`,

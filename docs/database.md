@@ -70,6 +70,15 @@ Stores pre-computed aggregated stats for each player.
 | `stats_json` | TEXT | Stringified JSON of `PlayerAggregatedStats` object (KDA, CS, damage, vision, winrate, champion stats, role stats, etc.) |
 | `computed_at` | INTEGER | Unix timestamp (ms) when stats were computed |
 
+### `match_slim`
+
+Each match from `matches`, trimmed to the fields the app reads (~10 KB instead of ~78 KB). Built inside Turso with JSON functions by `refreshMatchSlim()` (on schema init and after every `storeMatches`), in batches of 25. All season-wide reads use it through `executePaged`. To add a field, extend `SLIM_PARTICIPANT_FIELDS` / `SLIM_INFO_FIELDS` in `db.ts` and run `DELETE FROM match_slim` so it rebuilds.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `match_id` | TEXT PRIMARY KEY | Riot match ID |
+| `data` | TEXT | Slim match JSON (same shape as `Match`) |
+
 ### `sync_log`
 
 Tracks last sync time and match count per player.
