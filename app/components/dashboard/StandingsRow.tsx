@@ -23,7 +23,7 @@ import type { LeaderboardRow } from "./leaderboardRows";
  * appears once the panel is wide enough to hold it.
  */
 export const STANDINGS_COLUMNS =
-  "grid grid-cols-[1.5rem_minmax(0,1fr)_5.5rem] @2xl:grid-cols-[1.5rem_minmax(0,1.3fr)_5.5rem_minmax(0,1fr)] @5xl:grid-cols-[1.5rem_minmax(0,1.2fr)_5.5rem_minmax(0,1fr)_minmax(0,1.5fr)_1rem] items-center gap-x-5";
+  "grid grid-cols-[1.25rem_minmax(0,1fr)_3.5rem] gap-x-3 @md:grid-cols-[1.5rem_minmax(0,1fr)_5.5rem] @md:gap-x-5 @2xl:grid-cols-[1.5rem_minmax(0,1.3fr)_5.5rem_minmax(0,1fr)] @5xl:grid-cols-[1.5rem_minmax(0,1.2fr)_5.5rem_minmax(0,1fr)_minmax(0,1.5fr)_1rem] items-center";
 
 interface StandingsRowProps {
   row: LeaderboardRow;
@@ -38,7 +38,7 @@ export default function StandingsRow({ row, position, lastGame, version }: Stand
   return (
     <Link
       href={playerHref(player.gameName)}
-      className={cn(STANDINGS_COLUMNS, "group px-5 py-3 transition-colors hover:bg-muted")}
+      className={cn(STANDINGS_COLUMNS, "group px-4 py-3 transition-colors hover:bg-muted @md:px-5")}
     >
       <RankNumber position={position} />
 
@@ -63,7 +63,7 @@ export default function StandingsRow({ row, position, lastGame, version }: Stand
 
       <div className="text-right">
         <p className="num font-display text-lg font-semibold leading-none">{formatNumber(player.totalLp)}</p>
-        <p className="mt-1 text-[10px] uppercase tracking-wider text-faint">ladder LP</p>
+        <p className="mt-1 hidden text-[10px] uppercase tracking-wider text-faint @md:block">ladder LP</p>
       </div>
 
       <div className="hidden @2xl:block">

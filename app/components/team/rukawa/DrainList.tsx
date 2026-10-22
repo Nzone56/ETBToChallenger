@@ -40,18 +40,18 @@ export default function DrainList({ title, description, calloutLabel, rows, form
       )}
       <ul className="divide-y divide-border">
         {sorted.slice(0, limit).map((r) => (
-          <li key={r.key} className="flex items-center gap-4 py-2.5">
-            <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.teammate}</span>
-            <span className="num w-16 text-right text-sm text-win">
+          <li key={r.key} className="flex items-center gap-2 py-2.5 sm:gap-4">
+            <span className="min-w-0 flex-1 text-sm font-medium leading-tight break-words">{r.teammate}</span>
+            <span className="num w-12 text-right text-sm text-win sm:w-16">
               {format(r.without)}
               {r.withoutSub && <span className="block text-[10px] text-faint">{r.withoutSub}</span>}
             </span>
             <ArrowRight className="size-3.5 text-dossier" />
-            <span className="num w-16 text-sm text-loss">
+            <span className="num w-12 text-sm text-loss sm:w-16">
               {format(r.with)}
               {r.withSub && <span className="block text-[10px] text-faint">{r.withSub}</span>}
             </span>
-            <span className={cn("num w-16 text-right font-display text-sm font-semibold", r.drain > 0 ? "text-loss" : "text-win")}>
+            <span className={cn("num w-12 text-right font-display text-sm font-semibold sm:w-16", r.drain > 0 ? "text-loss" : "text-win")}>
               {r.drain > 0 ? "−" : "+"}
               {format(Math.abs(r.drain))}
             </span>

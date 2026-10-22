@@ -25,16 +25,18 @@ export const revalidate = 900;
 
 export default async function Home() {
   const puuids = users.map((u) => u.puuid);
-  const [roster, lastMatches, cirRoleAverages, loneWolfStats, stackStats, version, syncedAt] =
-    await Promise.all([
-      loadRoster(),
-      Promise.all(puuids.map((id) => getLastMatchByPuuid(id) as Promise<Match | null>)),
-      getCirRoleAverages(puuids),
-      getLoneWolfStats(puuids),
-      getPlayerStackStats(puuids),
-      getDdragonVersion(),
-      getLatestSyncedAt(),
-    ]);
+  const [roster, lastMatches, version, syncedAt] = await Promise.all([
+    loadRoster(),
+    Promise.all(puuids.map((id) => getLastMatchByPuuid(id) as Promise<Match | null>)),
+    getDdragonVersion(),
+    getLatestSyncedAt(),
+  ]);
+  // These read every season match. Run together on a cold cache they exceed
+  // Turso's response memory ("Resource exhausted"), so they go one at a time.
+  // Once cached (15 min) they cost nothing.
+  const cirRoleAverages = await getCirRoleAverages(puuids);
+  const loneWolfStats = await getLoneWolfStats(puuids);
+  const stackStats = await getPlayerStackStats(puuids);
 
   const dbEmpty = roster.every((p) => !p.flexEntry && !p.hasStats);
 

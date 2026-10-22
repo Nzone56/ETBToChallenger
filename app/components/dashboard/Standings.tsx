@@ -73,7 +73,7 @@ export default function Standings({ players, stackStats, lastGames, version }: S
       </div>
 
       <div
-        className={cn(STANDINGS_COLUMNS, "border-b border-border px-5 py-2 text-[10px] font-medium uppercase tracking-wider text-faint")}
+        className={cn(STANDINGS_COLUMNS, "border-b border-border px-4 py-2 text-[10px] @md:px-5 font-medium uppercase tracking-wider text-faint")}
         aria-hidden
       >
         <span>#</span>

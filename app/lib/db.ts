@@ -1458,7 +1458,6 @@ const _getLoneWolfStats = unstable_cache(
     const db = getDb();
     const { SEASON_START_EPOCH, QUEUE_FLEX } =
       await import("../data/constants");
-    const puuidSet = new Set(puuids);
 
     // Accumulate per-player counts
     const acc = new Map<
@@ -1474,48 +1473,41 @@ const _getLoneWolfStats = unstable_cache(
       acc.set(puuid, { gameName: puuid, solo: 0, duo: 0 });
     }
 
-    // Fetch all matches for all challenge players at once via group query
+    // Only who played each game — Turso extracts the three fields it needs, so
+    // the response is a few KB instead of every season match's full JSON
+    // (which tripped Turso's "Resource exhausted: mem_hrana_response").
     const res = await db.execute(
-      `SELECT DISTINCT m.match_id, m.data FROM matches m
-       JOIN player_matches pm ON pm.match_id = m.match_id
-       WHERE pm.puuid IN (${puuids.map(() => "?").join(",")})
-       ORDER BY m.match_id`,
+      `SELECT pm.match_id, pm.puuid,
+              json_extract(m.data, '$.info.gameDuration') AS duration,
+              json_extract(m.data, '$.info.gameStartTimestamp') AS started,
+              json_extract(m.data, '$.info.queueId') AS queue
+       FROM player_matches pm
+       JOIN matches m ON m.match_id = pm.match_id
+       WHERE pm.puuid IN (${puuids.map(() => "?").join(",")})`,
       puuids,
     );
 
+    const players = new Map<string, Set<string>>();
     for (const row of res.rows) {
-      const match = JSON.parse(row.data as string) as {
-        info: {
-          gameDuration: number;
-          gameStartTimestamp: number;
-          queueId: number;
-          participants: {
-            puuid: string;
-            riotIdGameName?: string;
-            profileIconId?: number | null;
-          }[];
-        };
-      };
+      if ((row.started as number) < SEASON_START_EPOCH) continue;
+      if ((row.queue as number) !== QUEUE_FLEX) continue;
+      if ((row.duration as number) < 300) continue; // skip remakes
+      const id = row.match_id as string;
+      if (!players.has(id)) players.set(id, new Set());
+      players.get(id)!.add(row.puuid as string);
+    }
 
-      if (match.info.gameStartTimestamp < SEASON_START_EPOCH) continue;
-      if (match.info.queueId !== QUEUE_FLEX) continue;
-      if (match.info.gameDuration < 300) continue; // skip remakes
+    const { users } = await import("../data/users");
+    for (const u of users) {
+      const entry = acc.get(u.puuid);
+      if (entry) entry.gameName = u.gameName;
+    }
 
-      // Count how many challenge players participated
-      const participatingPuuids = match.info.participants
-        .filter((p) => puuidSet.has(p.puuid))
-        .map((p) => p.puuid);
-
-      const count = participatingPuuids.length;
-      if (count === 0) continue;
-
-      for (const p of match.info.participants) {
-        if (!puuidSet.has(p.puuid)) continue;
-        const entry = acc.get(p.puuid);
+    for (const ids of players.values()) {
+      const count = ids.size;
+      for (const puuid of ids) {
+        const entry = acc.get(puuid);
         if (!entry) continue;
-        if (!entry.gameName || entry.gameName === p.puuid) {
-          entry.gameName = p.riotIdGameName ?? p.puuid;
-        }
         if (count === 1) entry.solo++;
         else if (count === 2) entry.duo++;
         // 3+ players together: not counted (group game)

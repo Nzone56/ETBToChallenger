@@ -23,7 +23,7 @@ export default function SynergyMatrix({ synergy }: { synergy: SynergyData[] }) {
               )}
             >
               <p className="h-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{tag}</p>
-              <p className="mt-1 truncate text-sm font-semibold">{s.teammate}</p>
+              <p className="mt-1 text-sm font-semibold leading-tight break-words">{s.teammate}</p>
               <p
                 className={cn(
                   "num font-display text-2xl font-semibold",

@@ -35,7 +35,7 @@ export default function RankBadge({
   const winrate = total > 0 ? (entry.wins / total) * 100 : 0;
 
   return (
-    <span className={cn("inline-flex items-center gap-1.5", TEXT[size], className)}>
+    <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap", TEXT[size], className)}>
       <RankEmblem tier={entry.tier} size={EMBLEM[size]} />
       <span className="font-semibold" style={{ color: TIER_COLORS[entry.tier] }}>
         {formatTier(entry.tier, entry.rank)}

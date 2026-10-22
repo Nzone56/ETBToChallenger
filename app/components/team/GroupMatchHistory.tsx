@@ -30,18 +30,18 @@ export default function GroupMatchHistory({ rows }: { rows: GroupMatchRow[] }) {
         <ul className="divide-y divide-border">
           {rows.slice(0, visible).map((row) => (
             <li key={row.matchId}>
-              <Link href={matchHref(row.matchId)} className="relative flex items-start gap-4 py-3 pl-5 pr-4 transition-colors hover:bg-muted">
+              <Link href={matchHref(row.matchId)} className="relative flex flex-col gap-2 py-3 pl-5 pr-4 transition-colors hover:bg-muted sm:flex-row sm:items-start sm:gap-4">
                 <span
                   className={cn(
                     "absolute inset-y-2 left-0 w-1 rounded-r-full",
                     row.outcome === "mixed" ? "bg-primary" : RESULT_STRIPE[row.outcome],
                   )}
                 />
-                <div className="w-32 shrink-0">
+                <div className="flex shrink-0 items-center gap-2 sm:block sm:w-32">
                   <Badge tone={row.outcome === "mixed" ? "primary" : row.outcome} size="xs">
                     {OUTCOME_LABEL[row.outcome]}
                   </Badge>
-                  <p className="num mt-1.5 text-xs text-faint">
+                  <p className="num text-xs text-faint sm:mt-1.5">
                     {row.players.length} of us · {formatDuration(row.duration)}
                   </p>
                 </div>

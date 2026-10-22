@@ -41,7 +41,7 @@ export default function PlayerHero({ player, version, skinUrl, mainChampion }: P
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary/60 to-transparent" />
 
       <div className="relative flex flex-col gap-8 p-6 lg:p-8">
-        <div className="flex items-center gap-5">
+        <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center">
           <ProfileIcon
             iconId={player.profileIconId}
             version={version}
@@ -59,7 +59,7 @@ export default function PlayerHero({ player, version, skinUrl, mainChampion }: P
               )}
               {mainChampion && <Badge size="xs">Most played · {mainChampion}</Badge>}
             </div>
-            <h1 className="mt-2 truncate font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+            <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight break-words sm:text-5xl">
               {player.gameName}
               <span className="ml-2 text-lg font-normal text-faint">#{player.tagLine}</span>
             </h1>
