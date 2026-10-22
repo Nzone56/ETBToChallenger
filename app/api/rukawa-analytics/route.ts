@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getRukawaAnalytics } from "@/app/lib/rukawaAnalytics";
 
-export const revalidate = 900;
-export const dynamic = "force-static";
+// Rendered on request, never at build: the build must not touch Turso
+// (see page.tsx). The data itself is cached via unstable_cache.
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {

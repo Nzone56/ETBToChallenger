@@ -42,11 +42,11 @@ Riot API → lib/sync.ts → Turso → lib/db.ts (unstable_cache, tag "db", 15 m
 
 - Expensive reads are wrapped in `unstable_cache` with the `db` tag. Payloads over ~2 MB (all matches of a player) use React `cache()` per request.
 - Raw Riot matches (~10 KB each) are reduced on the server before reaching client components.
-- Pages use `revalidate = 900` (ISR).
+- Pages render on request (none are prerendered at build); freshness comes from the 15-minute `unstable_cache`.
 
 ## Turso limits
 
-Several queries read every season match's JSON. Running many at once returns `Resource exhausted: mem_hrana_response`, so `next.config.ts` prerenders with a single worker (`experimental.cpus: 1`). Cache any new "read every match" query.
+Several queries read every season match's JSON. Running many at once returns `Resource exhausted: mem_hrana_response`, so DB-backed routes are `force-dynamic` and the build never queries Turso. Cache any new "read every match" query.
 
 ## Components
 

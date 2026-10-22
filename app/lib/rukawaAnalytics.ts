@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { getDb, ensureSchema, DB_TAG } from "./db";
+import { getDb, ensureSchema, DB_TAG, executePaged } from "./db";
 import { SEASON_START_EPOCH, QUEUE_FLEX } from "../data/constants";
 import { users } from "../data/users";
 import { Match } from "../types/riot";
@@ -85,11 +85,11 @@ async function computeRukawaAnalytics(): Promise<RukawaAnalytics> {
   }
 
   // Get all Rukawa's matches
-  const rukawaMatchesRes = await db.execute({
+  const rukawaMatchesRes = await executePaged(db, {
     sql: `SELECT DISTINCT m.match_id, m.data FROM matches m
           JOIN player_matches pm ON pm.match_id = m.match_id
           WHERE pm.puuid = ?
-          ORDER BY pm.played_at DESC`,
+          ORDER BY pm.played_at DESC, m.match_id`,
     args: [RUKAWA_PUUID],
   });
 
@@ -422,11 +422,11 @@ async function computeRukawaAnalytics(): Promise<RukawaAnalytics> {
 
   // Get CIR without Rukawa for each teammate
   for (const teammate of teammates) {
-    const teammateMatchesRes = await db.execute({
+    const teammateMatchesRes = await executePaged(db, {
       sql: `SELECT DISTINCT m.match_id, m.data FROM matches m
             JOIN player_matches pm ON pm.match_id = m.match_id
             WHERE pm.puuid = ?
-            ORDER BY pm.played_at DESC`,
+            ORDER BY pm.played_at DESC, m.match_id`,
       args: [teammate.puuid],
     });
 

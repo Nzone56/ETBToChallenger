@@ -20,8 +20,11 @@ import Standings from "./components/dashboard/Standings";
 import EmptyState from "./components/ui/EmptyState";
 import SyncTrigger from "./components/SyncTrigger";
 
-// Revalidate every 15 minutes — unstable_cache prevents redundant DB reads
-export const revalidate = 900;
+// Rendered on request, never prerendered at build: building on Vercel ran the
+// season-wide queries against a cold cache and hit Turso's "Resource
+// exhausted" limit. Every read is in unstable_cache (15 min), so a request
+// still costs no database work once warm.
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const puuids = users.map((u) => u.puuid);

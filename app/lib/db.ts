@@ -1,4 +1,4 @@
-import { createClient, type Client } from "@libsql/client";
+import { createClient, type Client, type InValue, type Row } from "@libsql/client";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { Match } from "../types/riot";
@@ -16,6 +16,34 @@ export function getDb(): Client {
   const authToken = process.env.TURSO_AUTH_TOKEN;
   _client = createClient({ url, authToken });
   return _client;
+}
+
+/** Matches per Turso response when reading full match JSON. */
+const MATCH_PAGE_SIZE = 40;
+
+/**
+ * `db.execute` for queries that return full match JSON, fetched in pages.
+ *
+ * A Riot match is tens of KB; a season of them in one response exceeds
+ * Turso's per-response memory ("Resource exhausted: mem_hrana_response") and
+ * the request fails. Paging keeps each response small and returns the same
+ * rows. The SQL must have a deterministic ORDER BY (ties broken by match_id)
+ * and no LIMIT of its own.
+ */
+export async function executePaged(
+  db: Client,
+  stmt: { sql: string; args?: InValue[] },
+  pageSize = MATCH_PAGE_SIZE,
+): Promise<{ rows: Row[] }> {
+  const rows: Row[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const res = await db.execute({
+      sql: `${stmt.sql} LIMIT ? OFFSET ?`,
+      args: [...(stmt.args ?? []), pageSize, offset],
+    });
+    rows.push(...res.rows);
+    if (res.rows.length < pageSize) return { rows };
+  }
 }
 
 // Returns a promise that resolves once the schema is ready.
@@ -100,11 +128,11 @@ export const getMatchesByPuuid = cache(
     const db = getDb();
     const { SEASON_START_EPOCH, QUEUE_FLEX } =
       await import("../data/constants");
-    const res = await db.execute({
+    const res = await executePaged(db, {
       sql: `SELECT m.data FROM matches m
           JOIN player_matches pm ON pm.match_id = m.match_id
           WHERE pm.puuid = ?
-          ORDER BY pm.played_at DESC`,
+          ORDER BY pm.played_at DESC, m.match_id`,
       args: [puuid],
     });
     // Filter for current season + Flex queue
@@ -201,11 +229,11 @@ const _getPentakillEvents = unstable_cache(
       await import("../data/constants");
     const events: PentakillEvent[] = [];
     for (const puuid of puuids) {
-      const res = await db.execute({
+      const res = await executePaged(db, {
         sql: `SELECT m.match_id, m.data, pm.played_at FROM matches m
               JOIN player_matches pm ON pm.match_id = m.match_id
               WHERE pm.puuid = ?
-              ORDER BY pm.played_at DESC`,
+              ORDER BY pm.played_at DESC, m.match_id`,
         args: [puuid],
       });
       for (const row of res.rows) {
@@ -631,11 +659,11 @@ const _getPlayerStackStats = unstable_cache(
 
     // Get all matches for each player and categorize by stack size
     for (const puuid of puuids) {
-      const matchRes = await db.execute({
+      const matchRes = await executePaged(db, {
         sql: `SELECT DISTINCT m.match_id, m.data FROM matches m
               JOIN player_matches pm ON pm.match_id = m.match_id
               WHERE pm.puuid = ?
-              ORDER BY pm.played_at DESC`,
+              ORDER BY pm.played_at DESC, m.match_id`,
         args: [puuid],
       });
 
@@ -719,11 +747,11 @@ export async function getPlayerRoleStackStats(
   }
 
   // Get all matches for the player
-  const matchRes = await db.execute({
+  const matchRes = await executePaged(db, {
     sql: `SELECT m.match_id, m.data FROM matches m
           JOIN player_matches pm ON pm.match_id = m.match_id
           WHERE pm.puuid = ?
-          ORDER BY pm.played_at DESC`,
+          ORDER BY pm.played_at DESC, m.match_id`,
     args: [puuid],
   });
 
@@ -839,11 +867,11 @@ const _getMatchRecords = unstable_cache(
     }
 
     for (const puuid of puuids) {
-      const res = await db.execute({
+      const res = await executePaged(db, {
         sql: `SELECT m.match_id, m.data, pm.played_at FROM matches m
               JOIN player_matches pm ON pm.match_id = m.match_id
               WHERE pm.puuid = ?
-              ORDER BY pm.played_at DESC`,
+              ORDER BY pm.played_at DESC, m.match_id`,
         args: [puuid],
       });
 
@@ -1045,11 +1073,11 @@ const _getMatchRecords = unstable_cache(
     const deltaRecords: MatchRecord[] = [];
 
     for (const puuid of puuids) {
-      const res = await db.execute({
+      const res = await executePaged(db, {
         sql: `SELECT m.match_id, m.data, pm.played_at FROM matches m
               JOIN player_matches pm ON pm.match_id = m.match_id
               WHERE pm.puuid = ?
-              ORDER BY pm.played_at DESC`,
+              ORDER BY pm.played_at DESC, m.match_id`,
         args: [puuid],
       });
 
@@ -1325,11 +1353,11 @@ const _getCirRoleAverages = unstable_cache(
     >();
 
     for (const puuid of puuids) {
-      const res = await db.execute({
+      const res = await executePaged(db, {
         sql: `SELECT m.match_id, m.data, pm.played_at FROM matches m
               JOIN player_matches pm ON pm.match_id = m.match_id
               WHERE pm.puuid = ?
-              ORDER BY pm.played_at DESC`,
+              ORDER BY pm.played_at DESC, m.match_id`,
         args: [puuid],
       });
 
