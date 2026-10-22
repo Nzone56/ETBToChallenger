@@ -67,7 +67,8 @@ Riot API ──▶ lib/sync.ts ──▶ Turso ──▶ lib/db.ts (unstable_cac
   its heavy reads one at a time. When a query only needs a few fields, let
   Turso extract them (`json_extract(m.data, '$.info.gameDuration')`) instead
   of returning whole match JSON — see `getLoneWolfStats`. Don't add another
-  "read every match" query without caching it.
+  "read every match" query without caching it, and read full match JSON only
+  through `executePaged` (`lib/db.ts`) — one unbounded response is what fails.
 
 ### Folders
 

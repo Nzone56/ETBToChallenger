@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { getDb, ensureSchema, DB_TAG } from "./db";
+import { getDb, ensureSchema, DB_TAG, executePaged } from "./db";
 import { SEASON_START_EPOCH, QUEUE_FLEX } from "../data/constants";
 import { users } from "../data/users";
 import { Match } from "../types/riot";
@@ -125,10 +125,11 @@ async function computeAwardsData(): Promise<AwardsData> {
     roleBuckets.set(user.puuid, roleMap);
     pickBuckets.set(user.puuid, pickMap);
 
-    const res = await db.execute({
+    const res = await executePaged(db, {
       sql: `SELECT DISTINCT m.match_id, m.data FROM matches m
             JOIN player_matches pm ON pm.match_id = m.match_id
-            WHERE pm.puuid = ?`,
+            WHERE pm.puuid = ?
+            ORDER BY m.match_id`,
       args: [user.puuid],
     });
 
