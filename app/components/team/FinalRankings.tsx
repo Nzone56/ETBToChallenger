@@ -1,8 +1,7 @@
-"use client";
-
-import { cn } from "@/app/lib/utils";
-import ProfileIcon from "@/app/components/ui/ProfileIcon";
 import { Trophy } from "lucide-react";
+import { Panel, PanelHeader } from "@/app/components/ui/Panel";
+import ProfileIcon from "@/app/components/ui/ProfileIcon";
+import RankNumber from "@/app/components/ui/RankNumber";
 import { type PlayerData, SORT_OPTIONS, computeRanks } from "./rankingUtils";
 
 interface FinalRankingsProps {
@@ -10,130 +9,55 @@ interface FinalRankingsProps {
   version: string;
 }
 
-const RANK_COLOR = [
-  "text-yellow-400",
-  "text-zinc-300",
-  "text-amber-600",
-  "text-zinc-500",
-  "text-zinc-500",
-  "text-zinc-600",
-  "text-zinc-600",
-];
-
-export default function FinalRankings({
-  players,
-  version,
-}: FinalRankingsProps) {
+/** Overall standing: each player's average position across every category. */
+export default function FinalRankings({ players, version }: FinalRankingsProps) {
   const allRanks = computeRanks(players);
   const total = SORT_OPTIONS.length;
 
-  const finalScores = players
+  const rows = players
     .map((player) => {
-      const playerRanks = allRanks.get(player.gameName)!;
-      const sum = SORT_OPTIONS.reduce(
-        (acc, opt) => acc + (playerRanks[opt.key] ?? players.length),
-        0,
-      );
-      const avg = sum / total;
-
-      const sorted = [...SORT_OPTIONS].sort(
-        (a, b) =>
-          (playerRanks[a.key] ?? players.length) -
-          (playerRanks[b.key] ?? players.length),
-      );
-      const best = sorted.slice(0, 3).map((o) => o.label);
-      const worst = sorted
-        .slice(-3)
-        .reverse()
-        .map((o) => o.label);
-
-      return { player, avg, best, worst };
+      const ranks = allRanks.get(player.gameName)!;
+      const rankOf = (key: (typeof SORT_OPTIONS)[number]["key"]) => ranks[key] ?? players.length;
+      const avg = SORT_OPTIONS.reduce((acc, o) => acc + rankOf(o.key), 0) / total;
+      const byRank = [...SORT_OPTIONS].sort((a, b) => rankOf(a.key) - rankOf(b.key));
+      return {
+        player,
+        avg,
+        best: byRank.slice(0, 3).map((o) => o.label),
+        worst: byRank.slice(-3).reverse().map((o) => o.label),
+      };
     })
-    .sort((a, b) => {
-      if (a.avg !== b.avg) return a.avg - b.avg;
-      return b.player.stats.totalGames - a.player.stats.totalGames;
-    });
+    .sort((a, b) => a.avg - b.avg || b.player.stats.totalGames - a.player.stats.totalGames);
 
   return (
-    <div>
-      <h2 className="mb-3 flex justify-between items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-        <div className="flex items-center gap-2">
-          <Trophy className="h-4 w-4 text-yellow-400" />
-          Final Rankings
-        </div>
-        <span className="text-xs font-normal text-zinc-600">
-          avg position across {total} categories
-        </span>
-      </h2>
-
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 divide-y divide-zinc-800/50 overflow-hidden">
-        {finalScores.map(({ player, avg, best, worst }, index) => (
-          <div
-            key={player.gameName}
-            className="flex items-center gap-4 px-4 py-3 hover:bg-zinc-800/30 transition-colors"
-          >
-            {/* Position number */}
-            <span
-              className={cn(
-                "w-6 text-center text-sm font-bold tabular-nums shrink-0",
-                RANK_COLOR[index] ?? "text-zinc-700",
-              )}
-            >
-              {index + 1}
-            </span>
-
-            {/* Avatar */}
-            <ProfileIcon
-              iconId={player.profileIconId}
-              version={version}
-              size={28}
-            />
-
-            {/* Name + games */}
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-zinc-200 truncate">
-                {player.gameName}
-              </div>
-              <div className="text-xs text-zinc-500">
-                {player.stats.totalGames} games
-              </div>
+    <Panel>
+      <PanelHeader icon={Trophy} title="Final rankings" description={`Average position across ${total} categories · lower is better`} />
+      <ol className="divide-y divide-border">
+        {rows.map(({ player, avg, best, worst }, i) => (
+          <li key={player.gameName} className="flex items-center gap-4 px-5 py-3">
+            <RankNumber position={i + 1} />
+            <ProfileIcon iconId={player.profileIconId} version={version} size={32} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{player.gameName}</p>
+              <p className="text-xs text-faint">{player.stats.totalGames} games</p>
             </div>
-
-            {/* Best / worst — hidden on small screens */}
-            <div className="hidden sm:flex flex-col gap-0.5 text-[10px] text-right">
-              <div className="flex items-center gap-1 justify-end">
-                <span className="text-zinc-600">Best</span>
-                {best.map((l) => (
-                  <span key={l} className="text-emerald-500 font-medium">
-                    {l}
-                  </span>
-                ))}
-              </div>
-              <div className="flex items-center gap-1 justify-end">
-                <span className="text-zinc-600">Worst</span>
-                {worst.map((l) => (
-                  <span key={l} className="text-red-500 font-medium">
-                    {l}
-                  </span>
-                ))}
-              </div>
+            <div className="hidden flex-col gap-1 text-right text-[11px] md:flex">
+              <p>
+                <span className="mr-1.5 text-faint">Best at</span>
+                <span className="text-win">{best.join(" · ")}</span>
+              </p>
+              <p>
+                <span className="mr-1.5 text-faint">Worst at</span>
+                <span className="text-loss">{worst.join(" · ")}</span>
+              </p>
             </div>
-
-            {/* Avg score */}
-            <div className="text-right shrink-0">
-              <div
-                className={cn(
-                  "text-base font-bold tabular-nums",
-                  RANK_COLOR[index] ?? "text-zinc-600",
-                )}
-              >
-                {avg.toFixed(2)}
-              </div>
-              <div className="text-[10px] text-zinc-600">avg rank</div>
+            <div className="w-16 text-right">
+              <p className="num font-display text-lg font-semibold leading-none">{avg.toFixed(2)}</p>
+              <p className="mt-1 text-[10px] uppercase tracking-wider text-faint">avg rank</p>
             </div>
-          </div>
+          </li>
         ))}
-      </div>
-    </div>
+      </ol>
+    </Panel>
   );
 }

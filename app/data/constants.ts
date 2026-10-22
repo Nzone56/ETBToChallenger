@@ -133,11 +133,27 @@ export const SEASON_START_EPOCH = new Date("2026-01-08T12:00:00Z").getTime();
 export const DDRAGON_VERSION_URL =
   "https://ddragon.leagueoflegends.com/api/versions.json";
 
+// Match data and DDragon disagree on a few champion ids; DDragon 403s on the
+// match spelling. Add to this map when an icon or splash comes back broken.
+const DDRAGON_ID_FIXES: Record<string, string> = {
+  FiddleSticks: "Fiddlesticks",
+};
+
+/** The id DDragon expects for a champion name as it appears in match data. */
+export function ddragonChampionId(championName: string): string {
+  return DDRAGON_ID_FIXES[championName] ?? championName;
+}
+
 export function getChampionIconUrl(
   championName: string,
   version: string,
 ): string {
-  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championName}.png`;
+  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${ddragonChampionId(championName)}.png`;
+}
+
+/** Splash art for one skin (unversioned on DDragon). Skin 0 is the default. */
+export function getChampionSplashUrl(championName: string, skinNum = 0): string {
+  return `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${ddragonChampionId(championName)}_${skinNum}.jpg`;
 }
 
 export function getProfileIconUrl(iconId: number, version: string): string {

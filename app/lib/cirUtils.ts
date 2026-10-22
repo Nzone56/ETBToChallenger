@@ -1,43 +1,101 @@
 /**
- * CIR color utilities - reusable functions for CIR tier colors and labels
+ * CIR tiers — the single source for how a CIR score reads on screen.
+ *
+ * Thresholds, labels and colour classes live together so a badge, a table cell
+ * and a leaderboard can never disagree about what "Great" means.
  */
 
-/** Get Tailwind color class for a CIR score */
-export function getCirColor(cir: number): string {
-  if (cir >= 20) return "text-yellow-400";
-  if (cir >= 15) return "text-orange-400";
-  if (cir >= 11) return "text-emerald-400";
-  if (cir >= 8) return "text-sky-400";
-  if (cir >= 6) return "text-zinc-300";
-  return "text-red-400";
+export type CirTierKey =
+  | "legendary"
+  | "dominant"
+  | "great"
+  | "solid"
+  | "average"
+  | "poor";
+
+export interface CirTier {
+  key: CirTierKey;
+  label: string;
+  letter: string;
+  /** Text colour class */
+  text: string;
+  /** Tinted surface + border classes for badges */
+  soft: string;
 }
 
-/** Get CIR tier label (first letter only) */
-export function getCirTierLetter(cir: number): string {
-  if (cir >= 20) return "L"; // Legendary
-  if (cir >= 15) return "D"; // Dominant
-  if (cir >= 11) return "G"; // Great
-  if (cir >= 8) return "S"; // Solid
-  if (cir >= 6) return "A"; // Average
-  return "P"; // Poor
+const TIERS: { min: number; tier: CirTier }[] = [
+  {
+    min: 20,
+    tier: {
+      key: "legendary",
+      label: "Legendary",
+      letter: "L",
+      text: "text-cir-legendary",
+      soft: "bg-cir-legendary/10 border-cir-legendary/30",
+    },
+  },
+  {
+    min: 15,
+    tier: {
+      key: "dominant",
+      label: "Dominant",
+      letter: "D",
+      text: "text-cir-dominant",
+      soft: "bg-cir-dominant/10 border-cir-dominant/30",
+    },
+  },
+  {
+    min: 11,
+    tier: {
+      key: "great",
+      label: "Great",
+      letter: "G",
+      text: "text-cir-great",
+      soft: "bg-cir-great/10 border-cir-great/30",
+    },
+  },
+  {
+    min: 8,
+    tier: {
+      key: "solid",
+      label: "Solid",
+      letter: "S",
+      text: "text-cir-solid",
+      soft: "bg-cir-solid/10 border-cir-solid/30",
+    },
+  },
+  {
+    min: 6,
+    tier: {
+      key: "average",
+      label: "Average",
+      letter: "A",
+      text: "text-cir-average",
+      soft: "bg-cir-average/10 border-cir-average/25",
+    },
+  },
+  {
+    min: -Infinity,
+    tier: {
+      key: "poor",
+      label: "Poor",
+      letter: "P",
+      text: "text-cir-poor",
+      soft: "bg-cir-poor/10 border-cir-poor/30",
+    },
+  },
+];
+
+/** Score at or above which a performance counts as legendary. */
+export const CIR_LEGENDARY_MIN = 20;
+/** Score below which a performance counts as poor. */
+export const CIR_POOR_BELOW = 6;
+
+export function getCirTier(score: number): CirTier {
+  return (TIERS.find((t) => score >= t.min) ?? TIERS[TIERS.length - 1]).tier;
 }
 
-/** Get CIR tier label (first letter only) */
-export function getCirTierWord(cir: number): string {
-  if (cir >= 20) return "Legendary"; // Legendary
-  if (cir >= 15) return "Dominant"; // Dominant
-  if (cir >= 11) return "Great"; // Great
-  if (cir >= 8) return "Solid"; // Solid
-  if (cir >= 6) return "Average"; // Average
-  return "Poor"; // Poor
-}
-
-/** Get background color class for CIR badge */
-export function getCirBgColor(cir: number): string {
-  if (cir >= 20) return "border-yellow-500/30 bg-yellow-500/10";
-  if (cir >= 15) return "border-orange-500/30 bg-orange-500/10";
-  if (cir >= 11) return "border-emerald-500/30 bg-emerald-500/10";
-  if (cir >= 8) return "border-sky-500/30 bg-sky-500/10";
-  if (cir >= 6) return "border-zinc-600/30 bg-zinc-800/30";
-  return "border-red-500/30 bg-red-500/10";
+/** Text colour class for a CIR score. */
+export function getCirColor(score: number): string {
+  return getCirTier(score).text;
 }

@@ -20,7 +20,11 @@ export default function ChampionIcon({
       alt={championName}
       width={size}
       height={size}
-      className={cn("rounded-lg", className)}
+      style={{ width: size, height: size }}
+      className={cn(
+        "shrink-0 rounded-md bg-muted ring-1 ring-border-strong",
+        className,
+      )}
       loading="lazy"
     />
   );

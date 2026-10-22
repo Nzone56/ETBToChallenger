@@ -1,200 +1,92 @@
-import { MatchRecord } from "@/app/lib/db";
-import ChampionIcon from "@/app/components/ui/ChampionIcon";
-import { formatColombianDate } from "@/app/lib/dateUtils";
 import Link from "next/link";
 import {
-  Swords,
-  Skull,
-  Handshake,
-  Zap,
-  Coins,
-  TrendingUp,
-  Crown,
   Anchor,
+  Coins,
+  Crown,
+  Handshake,
+  Skull,
+  Swords,
   TrendingDown,
+  TrendingUp,
+  Wheat,
+  Zap,
+  type LucideIcon,
 } from "lucide-react";
+import type { MatchRecord } from "@/app/lib/db";
+import ChampionIcon from "@/app/components/ui/ChampionIcon";
+import ResultBadge from "@/app/components/ui/ResultBadge";
+import { formatColombianDate } from "@/app/lib/dateUtils";
+import { formatNumber, formatSigned } from "@/app/lib/format";
+import { matchHref } from "@/app/lib/roster";
+import { cn } from "@/app/lib/utils";
 
-const CATEGORY_META: Record<
-  string,
-  {
-    icon: React.ReactNode;
-    color: string;
-    border: string;
-    format: (v: number) => string;
-    subtitle: (r: MatchRecord) => string;
-  }
-> = {
-  "Most Kills": {
-    icon: <Swords className="h-4 w-4 text-red-400" />,
-    color: "text-red-300",
-    border: "border-red-800/30",
-    format: (v) => String(Math.round(v)),
-    subtitle: (r) => `${r.kills} / ${r.deaths} / ${r.assists}`,
-  },
-  "Most Deaths": {
-    icon: <Skull className="h-4 w-4 text-zinc-400" />,
-    color: "text-zinc-300",
-    border: "border-zinc-700/40",
-    format: (v) => String(Math.round(v)),
-    subtitle: (r) => `${r.kills} / ${r.deaths} / ${r.assists}`,
-  },
-  "Most Assists": {
-    icon: <Handshake className="h-4 w-4 text-sky-400" />,
-    color: "text-sky-300",
-    border: "border-sky-800/30",
-    format: (v) => String(Math.round(v)),
-    subtitle: (r) => `${r.kills} / ${r.deaths} / ${r.assists}`,
-  },
-  "Highest DMG/min": {
-    icon: <Zap className="h-4 w-4 text-orange-400" />,
-    color: "text-orange-300",
-    border: "border-orange-800/30",
-    format: (v) => `${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game`,
-  },
-  "Highest Gold/min": {
-    icon: <Coins className="h-4 w-4 text-yellow-400" />,
-    color: "text-yellow-300",
-    border: "border-yellow-800/30",
-    format: (v) => `${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game`,
-  },
-  "Highest CS/min": {
-    icon: <TrendingUp className="h-4 w-4 text-emerald-400" />,
-    color: "text-emerald-300",
-    border: "border-emerald-800/30",
-    format: (v) => v.toFixed(2),
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game`,
-  },
-  "Highest Gold Lead": {
-    icon: <Coins className="h-4 w-4 text-amber-400" />,
-    color: "text-amber-300",
-    border: "border-amber-800/30",
-    format: (v) => `${v >= 0 ? "+" : ""}${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game`,
-  },
-  "Highest DMG Lead": {
-    icon: <Zap className="h-4 w-4 text-fuchsia-400" />,
-    color: "text-fuchsia-300",
-    border: "border-fuchsia-800/30",
-    format: (v) => `${v >= 0 ? "+" : ""}${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game`,
-  },
-  "Lowest DMG/min": {
-    icon: <Zap className="h-4 w-4 text-red-600" />,
-    color: "text-red-400",
-    border: "border-red-900/30",
-    format: (v) => `${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game · excl. supp`,
-  },
-  "Lowest Gold/min": {
-    icon: <Coins className="h-4 w-4 text-zinc-500" />,
-    color: "text-zinc-400",
-    border: "border-zinc-700/30",
-    format: (v) => `${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game · excl. supp`,
-  },
-  "Lowest CS/min": {
-    icon: <TrendingUp className="h-4 w-4 text-zinc-500" />,
-    color: "text-zinc-400",
-    border: "border-zinc-700/30",
-    format: (v) => v.toFixed(2),
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game · excl. supp`,
-  },
-  "Lowest Gold Lead": {
-    icon: <Coins className="h-4 w-4 text-red-600" />,
-    color: "text-red-400",
-    border: "border-red-900/30",
-    format: (v) => `${v >= 0 ? "+" : ""}${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game · excl. supp`,
-  },
-  "Lowest DMG Lead": {
-    icon: <Zap className="h-4 w-4 text-red-600" />,
-    color: "text-red-400",
-    border: "border-red-900/30",
-    format: (v) => `${v >= 0 ? "+" : ""}${Math.round(v).toLocaleString()}`,
-    subtitle: (r) => `${Math.round(r.durationMin ?? 0)}min game · excl. supp`,
-  },
-  "1vs9 GOAT": {
-    icon: <Crown className="h-4 w-4 text-yellow-400" />,
-    color: "text-yellow-300",
-    border: "border-yellow-500/40",
-    format: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}`,
-    subtitle: () => `CIR Δ vs Team Avg`,
-  },
-  "Lane Dominator King": {
-    icon: <Zap className="h-4 w-4 text-cyan-400" />,
-    color: "text-cyan-300",
-    border: "border-cyan-500/40",
-    format: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}`,
-    subtitle: () => `CIR Δ vs Opponent`,
-  },
-  "Dead Weight Anchor": {
-    icon: <Anchor className="h-4 w-4 text-red-500" />,
-    color: "text-red-400",
-    border: "border-red-900/50",
-    format: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}`,
-    subtitle: () => `CIR Δ vs Team Avg`,
-  },
-  "Diffed Gap": {
-    icon: <TrendingDown className="h-4 w-4 text-orange-500" />,
-    color: "text-orange-400",
-    border: "border-orange-900/50",
-    format: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}`,
-    subtitle: () => `CIR Δ vs Opponent`,
-  },
+interface CategoryMeta {
+  icon: LucideIcon;
+  format: (v: number) => string;
+  subtitle: (r: MatchRecord) => string;
+}
+
+const kda = (r: MatchRecord) => `${r.kills} / ${r.deaths} / ${r.assists}`;
+const length = (r: MatchRecord) => `${Math.round(r.durationMin ?? 0)} min game`;
+const lengthNoSupp = (r: MatchRecord) => `${length(r)} · excl. support`;
+const whole = (v: number) => String(Math.round(v));
+const signed = (v: number) => formatSigned(v);
+const delta = (v: number) => formatSigned(v, 1);
+
+const CATEGORY_META: Record<string, CategoryMeta> = {
+  "Most Kills": { icon: Swords, format: whole, subtitle: kda },
+  "Most Deaths": { icon: Skull, format: whole, subtitle: kda },
+  "Most Assists": { icon: Handshake, format: whole, subtitle: kda },
+  "Highest DMG/min": { icon: Zap, format: formatNumber, subtitle: length },
+  "Highest Gold/min": { icon: Coins, format: formatNumber, subtitle: length },
+  "Highest CS/min": { icon: Wheat, format: (v) => v.toFixed(2), subtitle: length },
+  "Highest Gold Lead": { icon: TrendingUp, format: signed, subtitle: length },
+  "Highest DMG Lead": { icon: TrendingUp, format: signed, subtitle: length },
+  "Lowest DMG/min": { icon: Zap, format: formatNumber, subtitle: lengthNoSupp },
+  "Lowest Gold/min": { icon: Coins, format: formatNumber, subtitle: lengthNoSupp },
+  "Lowest CS/min": { icon: Wheat, format: (v) => v.toFixed(2), subtitle: lengthNoSupp },
+  "Lowest Gold Lead": { icon: TrendingDown, format: signed, subtitle: lengthNoSupp },
+  "Lowest DMG Lead": { icon: TrendingDown, format: signed, subtitle: lengthNoSupp },
+  "1vs9 GOAT": { icon: Crown, format: delta, subtitle: () => "CIR Δ vs team average" },
+  "Lane Dominator King": { icon: Zap, format: delta, subtitle: () => "CIR Δ vs lane opponent" },
+  "Dead Weight Anchor": { icon: Anchor, format: delta, subtitle: () => "CIR Δ vs team average" },
+  "Diffed Gap": { icon: TrendingDown, format: delta, subtitle: () => "CIR Δ vs lane opponent" },
 };
 
-function RecordCard({
-  record,
-  version,
-}: {
+interface RecordCardProps {
   record: MatchRecord;
   version: string;
-}) {
+  tone: "best" | "worst";
+}
+
+/** A single-game season record: the figure, who set it, on what. */
+export default function RecordCard({ record, version, tone }: RecordCardProps) {
   const meta = CATEGORY_META[record.category];
-  const date = formatColombianDate(record.playedAt);
+  if (!meta) return null;
+  const Icon = meta.icon;
 
   return (
     <Link
-      href={`/match/${record.matchId}`}
-      className={`flex items-center gap-3 rounded-xl border ${meta.border} bg-zinc-900/50 px-4 py-3 backdrop-blur-sm transition-all hover:bg-zinc-900/70 hover:border-opacity-60 cursor-pointer`}
+      href={matchHref(record.matchId)}
+      className="group flex flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-border-strong hover:bg-raised"
     >
-      <ChampionIcon
-        championName={record.championName}
-        version={version}
-        size={44}
-        className="shrink-0 rounded-lg"
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          {meta.icon}
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-            {record.category}
-          </span>
+      <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <Icon className={cn("size-3.5", tone === "best" ? "text-primary" : "text-loss")} />
+        {record.category}
+      </p>
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="num font-display text-3xl font-semibold leading-none">{meta.format(record.value)}</p>
+          <p className="mt-1.5 truncate text-xs text-faint">{meta.subtitle(record)}</p>
         </div>
-        <div className={`text-xl font-bold tabular-nums ${meta.color}`}>
-          {meta.format(record.value)}
-        </div>
-        <div className="text-xs text-zinc-400 truncate">
-          {meta.subtitle(record)}
-        </div>
+        <ChampionIcon championName={record.championName} version={version} size={44} />
       </div>
-      <div className="shrink-0 text-right">
-        <div className="text-sm font-semibold text-zinc-200 truncate max-w-20">
-          {record.gameName}
-        </div>
-        <div className="text-xs text-zinc-500 truncate max-w-20">
-          {record.championName}
-        </div>
-        <div className="text-[10px] text-zinc-600">{date}</div>
-        <div
-          className={`mt-0.5 text-[10px] font-semibold ${record.win ? "text-emerald-400" : "text-red-400"}`}
-        >
-          {record.win ? "WIN" : "LOSS"}
-        </div>
+      <div className="flex items-center gap-2 border-t border-border pt-3 text-xs">
+        <span className="truncate font-semibold">{record.gameName}</span>
+        <span className="truncate text-muted-foreground">{record.championName}</span>
+        <ResultBadge result={record.win ? "win" : "loss"} className="ml-auto" />
+        <span className="num shrink-0 text-faint">{formatColombianDate(record.playedAt)}</span>
       </div>
     </Link>
   );
 }
-export default RecordCard;

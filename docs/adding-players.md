@@ -31,7 +31,7 @@ The application automatically:
 - Fetches ranked data for the new player
 - Includes them in all leaderboards and "Best of" calculations
 - Creates their player detail page at `/player/PlayerName`
-- Adds them to the NavHeader player dropdown
+- Adds them to the sidebar roster (ordered by ladder LP)
 - Includes them in team analytics
 
 ## How to Remove a Player

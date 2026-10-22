@@ -1,188 +1,75 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { type SlimGroupMatch } from "@/app/lib/db";
-import { calcKda, formatKda, isRemake } from "@/app/lib/helpers";
-import { cn } from "@/app/lib/utils";
-import { Users, ChevronDown } from "lucide-react";
+import { useState } from "react";
 import Link from "next/link";
+import { Users } from "lucide-react";
+import { Panel, PanelHeader } from "@/app/components/ui/Panel";
+import EmptyState from "@/app/components/ui/EmptyState";
+import MoreButton from "@/app/components/ui/MoreButton";
+import Badge from "@/app/components/ui/Badge";
+import { RESULT_STRIPE } from "@/app/components/ui/ResultBadge";
+import { calcKda, formatDuration, formatKda } from "@/app/lib/format";
+import type { GroupMatchRowData as GroupMatchRow } from "@/app/lib/groupMatches";
+import { matchHref } from "@/app/lib/roster";
+import { cn } from "@/app/lib/utils";
 
 const PAGE_SIZE = 10;
 
-type GroupMatchEntry = {
-  match: SlimGroupMatch;
-  players: { puuid: string; gameName: string }[];
-};
+const OUTCOME_LABEL = { win: "Win", loss: "Loss", remake: "Remake", mixed: "Opposing teams" } as const;
 
-export default function GroupMatchHistory() {
-  const [groupMatches, setGroupMatches] = useState<GroupMatchEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-
-  useEffect(() => {
-    fetch("/api/group-matches")
-      .then((r) => r.json())
-      .then((data: GroupMatchEntry[]) => {
-        setGroupMatches(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
-  if (loading) {
-    return (
-      <div>
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-          <Users className="h-4 w-4" />
-          Group Matches
-        </h2>
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 text-center text-sm text-zinc-500">
-          Loading…
-        </div>
-      </div>
-    );
-  }
-
-  if (groupMatches.length === 0) {
-    return (
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 text-center text-sm text-zinc-500">
-        No group matches found in recent history
-      </div>
-    );
-  }
-
-  const visible = groupMatches.slice(0, visibleCount);
-  const hasMore = visibleCount < groupMatches.length;
+/** Every game where two or more of the roster queued together. */
+export default function GroupMatchHistory({ rows }: { rows: GroupMatchRow[] }) {
+  const [visible, setVisible] = useState(PAGE_SIZE);
 
   return (
-    <div>
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-        <Users className="h-4 w-4" />
-        Group Matches
-        <span className="text-xs font-normal text-zinc-600">
-          ({groupMatches.length} matches · 2+ members together)
-        </span>
-      </h2>
-
-      <div className="space-y-2 stagger-rows">
-        {visible.map(({ match, players }) => {
-          const allWin = players.every((pl) => {
-            const p = match.info.participants.find(
-              (pt) => pt.puuid === pl.puuid,
-            );
-            return p?.win;
-          });
-          const allLoss = players.every((pl) => {
-            const p = match.info.participants.find(
-              (pt) => pt.puuid === pl.puuid,
-            );
-            return p && !p.win;
-          });
-
-          const remake = isRemake(match.info.gameDuration);
-          const resultLabel = remake
-            ? "REMAKE"
-            : allWin
-              ? "WIN"
-              : allLoss
-                ? "LOSS"
-                : "MIXED";
-          const duration = Math.floor(match.info.gameDuration / 60);
-
-          return (
-            <Link
-              key={match.metadata.matchId}
-              href={`/match/${match.metadata.matchId}`}
-              className={cn(
-                "rounded-xl border px-4 py-3 backdrop-blur-sm transition-colors cursor-pointer block",
-                remake
-                  ? "border-zinc-700/40 bg-zinc-900/30 hover:bg-zinc-900/50"
-                  : allWin
-                    ? "border-emerald-800/40 bg-emerald-950/15 hover:bg-emerald-950/25"
-                    : allLoss
-                      ? "border-red-800/40 bg-red-950/15 hover:bg-red-950/25"
-                      : "border-zinc-700/40 bg-zinc-900/40 hover:bg-zinc-800/40",
-              )}
-            >
-              {/* Header */}
-              <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "rounded-md px-2 py-0.5 text-xs font-bold",
-                      remake
-                        ? "bg-zinc-700/40 text-zinc-500"
-                        : allWin
-                          ? "bg-emerald-500/20 text-emerald-400"
-                          : allLoss
-                            ? "bg-red-500/20 text-red-400"
-                            : "bg-zinc-500/20 text-zinc-400",
-                    )}
-                  >
-                    {resultLabel}
-                  </span>
-                  <span className="text-xs text-zinc-500">
-                    {players.length} members · {duration}m
-                  </span>
+    <Panel>
+      <PanelHeader icon={Users} title="Stacked games" description={`${rows.length} games with two or more of us`} />
+      {rows.length === 0 ? (
+        <EmptyState title="No stacked games yet" />
+      ) : (
+        <ul className="divide-y divide-border">
+          {rows.slice(0, visible).map((row) => (
+            <li key={row.matchId}>
+              <Link href={matchHref(row.matchId)} className="relative flex flex-col gap-2 py-3 pl-5 pr-4 transition-colors hover:bg-muted sm:flex-row sm:items-start sm:gap-4">
+                <span
+                  className={cn(
+                    "absolute inset-y-2 left-0 w-1 rounded-r-full",
+                    row.outcome === "mixed" ? "bg-primary" : RESULT_STRIPE[row.outcome],
+                  )}
+                />
+                <div className="flex shrink-0 items-center gap-2 sm:block sm:w-32">
+                  <Badge tone={row.outcome === "mixed" ? "primary" : row.outcome} size="xs">
+                    {OUTCOME_LABEL[row.outcome]}
+                  </Badge>
+                  <p className="num text-xs text-faint sm:mt-1.5">
+                    {row.players.length} of us · {formatDuration(row.duration)}
+                  </p>
                 </div>
-              </div>
-
-              {/* Players in this match */}
-              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                {players.map((pl) => {
-                  const p = match.info.participants.find(
-                    (pt) => pt.puuid === pl.puuid,
-                  );
-                  if (!p) return null;
-
-                  const kda = calcKda(p.kills, p.deaths, p.assists);
-
-                  return (
-                    <div
-                      key={pl.puuid}
-                      className="flex items-center gap-2 text-xs"
-                    >
-                      <span
-                        className={cn(
-                          "h-1.5 w-1.5 rounded-full",
-                          p.win ? "bg-emerald-400" : "bg-red-400",
-                        )}
-                      />
-                      <span className="font-medium text-zinc-300">
-                        {pl.gameName}
-                      </span>
-                      <span className="text-zinc-500">{p.championName}</span>
-                      <span className="text-zinc-400">
+                <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
+                  {row.players.map((p) => (
+                    <p key={p.puuid} className="flex items-center gap-2 text-xs">
+                      <span className={cn("size-1.5 shrink-0 rounded-full", p.win ? "bg-win" : "bg-loss")} />
+                      <span className="truncate font-medium text-foreground">{p.gameName}</span>
+                      <span className="truncate text-muted-foreground">{p.championName}</span>
+                      <span className="num ml-auto shrink-0 text-muted-foreground">
                         {p.kills}/{p.deaths}/{p.assists}
                       </span>
-                      <span className="text-zinc-600">
-                        {formatKda(kda)} KDA
+                      <span className="num w-10 shrink-0 text-right text-faint">
+                        {formatKda(calcKda(p.kills, p.deaths, p.assists))}
                       </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Load More */}
-      {hasMore && (
-        <button
-          onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
-          className="cursor-pointer mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800/50 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-700/50 hover:text-white"
-        >
-          <ChevronDown className="h-4 w-4" />
-          Load More ({groupMatches.length - visibleCount} remaining)
-        </button>
+                    </p>
+                  ))}
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
-
-      {!hasMore && groupMatches.length > PAGE_SIZE && (
-        <div className="mt-4 text-center text-xs text-zinc-600">
-          All group matches loaded
-        </div>
+      {visible < rows.length && (
+        <MoreButton onClick={() => setVisible((v) => v + PAGE_SIZE)}>
+          Show {Math.min(PAGE_SIZE, rows.length - visible)} more · {rows.length - visible} left
+        </MoreButton>
       )}
-    </div>
+    </Panel>
   );
 }

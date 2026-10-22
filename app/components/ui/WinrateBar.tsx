@@ -1,4 +1,5 @@
 import { cn } from "@/app/lib/utils";
+import { formatWinrate } from "@/app/lib/format";
 
 interface WinrateBarProps {
   wins: number;
@@ -7,6 +8,7 @@ interface WinrateBarProps {
   showLabel?: boolean;
 }
 
+/** Wins against losses as one split bar. */
 export default function WinrateBar({
   wins,
   losses,
@@ -19,17 +21,30 @@ export default function WinrateBar({
   return (
     <div className={cn("w-full", className)}>
       {showLabel && (
-        <div className="mb-1 flex justify-between text-xs">
-          <span className="text-emerald-400">{wins}W</span>
-          <span className="font-medium text-zinc-300">{winrate.toFixed(1)}%</span>
-          <span className="text-red-400">{losses}L</span>
+        <div className="num mb-1.5 flex items-baseline justify-between text-xs">
+          <span className="text-win">{wins}W</span>
+          <span className="font-medium text-foreground">
+            {formatWinrate(winrate)}
+          </span>
+          <span className="text-loss">{losses}L</span>
         </div>
       )}
-      <div className="flex h-2 w-full overflow-hidden rounded-full bg-red-900/50">
-        <div
-          className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-          style={{ width: `${winrate}%` }}
-        />
+      <div
+        className="flex h-1.5 w-full gap-0.5 overflow-hidden rounded-full"
+        role="img"
+        aria-label={`${wins} wins, ${losses} losses`}
+      >
+        {total === 0 ? (
+          <div className="h-full w-full bg-muted" />
+        ) : (
+          <>
+            <div
+              className="grow-x h-full rounded-full bg-win"
+              style={{ width: `${winrate}%` }}
+            />
+            <div className="h-full flex-1 rounded-full bg-loss/40" />
+          </>
+        )}
       </div>
     </div>
   );

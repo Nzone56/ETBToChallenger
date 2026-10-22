@@ -224,10 +224,14 @@ describe("computeCIR_v3 — calibration & sanity", () => {
   });
 
   describe("role-aware pillar checks", () => {
-    it("support role uses UTILITY weights (0.60)", () => {
+    it("support role uses UTILITY weights (0.50)", () => {
       const { weights } = computeCIR_v3(SUPP_AVERAGE);
-      expect(weights.utility).toBe(0.6);
-      expect(weights.combat).toBe(0.15);
+      expect(weights).toEqual({
+        combat: 0.3,
+        utility: 0.5,
+        economy: 0.15,
+        pressure: 0.05,
+      });
     });
 
     it("ADC role uses ECONOMY weights (0.35)", () => {
@@ -252,26 +256,44 @@ describe("computeCIR_v3 — calibration & sanity", () => {
     });
   });
 
-  describe("goldLead cap prevents stomp inflation", () => {
-    it("10k gold lead is treated the same as 3k gold lead", () => {
+  describe("lead caps (±5k) prevent stomp inflation", () => {
+    it("10k gold lead is treated the same as 5k gold lead", () => {
       const capped = computeCIR_v3({ ...ADC_AVERAGE, goldLead: 10_000 }).score;
       const maxCapped = computeCIR_v3({
         ...ADC_AVERAGE,
-        goldLead: 3_000,
+        goldLead: 5_000,
       }).score;
       expect(capped).toBeCloseTo(maxCapped, 1);
     });
 
-    it("–10k gold deficit is treated the same as –3k", () => {
+    it("–10k gold deficit is treated the same as –5k", () => {
       const deepDeficit = computeCIR_v3({
         ...ADC_AVERAGE,
         goldLead: -10_000,
       }).score;
       const cappedDeficit = computeCIR_v3({
         ...ADC_AVERAGE,
-        goldLead: -3_000,
+        goldLead: -5_000,
       }).score;
       expect(deepDeficit).toBeCloseTo(cappedDeficit, 1);
+    });
+
+    it("gold lead below the cap still counts", () => {
+      const small = computeCIR_v3({ ...ADC_AVERAGE, goldLead: 1_000 }).score;
+      const atCap = computeCIR_v3({ ...ADC_AVERAGE, goldLead: 5_000 }).score;
+      expect(atCap).toBeGreaterThan(small);
+    });
+
+    it("10k damage lead is treated the same as 5k damage lead", () => {
+      const huge = computeCIR_v3({ ...ADC_AVERAGE, dmgLead: 10_000 }).score;
+      const atCap = computeCIR_v3({ ...ADC_AVERAGE, dmgLead: 5_000 }).score;
+      expect(huge).toBeCloseTo(atCap, 1);
+    });
+
+    it("–10k damage deficit is treated the same as –5k", () => {
+      const huge = computeCIR_v3({ ...ADC_AVERAGE, dmgLead: -10_000 }).score;
+      const atCap = computeCIR_v3({ ...ADC_AVERAGE, dmgLead: -5_000 }).score;
+      expect(huge).toBeCloseTo(atCap, 1);
     });
   });
 

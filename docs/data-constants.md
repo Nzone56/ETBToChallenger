@@ -28,7 +28,7 @@ The ranked ladder is modeled as a continuous LP scale:
 - `tierWidthPercent(tier)` — Returns the proportional width of a tier segment as a percentage of the full bar.
 - `tierStartPercent(tier)` — Returns where a tier starts on the progress bar.
 
-These are defined in `constants.ts` and consumed by `ProgressBarSegmented`.
+These are defined in `constants.ts` and consumed by `TierProgressBar` (`app/components/ui/TierProgressBar.tsx`).
 
 ### Tier Colors
 

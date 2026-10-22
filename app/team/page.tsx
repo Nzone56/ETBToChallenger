@@ -1,116 +1,84 @@
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { BarChart3, FileWarning } from "lucide-react";
 import { users } from "@/app/data/users";
 import { getDdragonVersion } from "@/app/lib/service";
 import {
-  getAllRankedSnapshots,
-  getAllPlayerStats,
+  getCirRoleAverages,
   getGroupMatchCount,
+  getGroupMatches,
   getGroupMatchWins,
   getLatestSyncedAt,
-  getCirRoleAverages,
-  type RankedSnapshot,
 } from "@/app/lib/db";
-import { EMPTY_STATS } from "@/app/lib/helpers";
-import type { Summoner, PlayerAggregatedStats } from "@/app/types/riot";
+import { toGroupMatchRows } from "@/app/lib/groupMatches";
+import { loadRoster } from "@/app/lib/roster";
+import { getRukawaAnalytics } from "@/app/lib/rukawaAnalytics";
+import PageHeader from "@/app/components/layout/PageHeader";
+import PageSkeleton from "@/app/components/layout/PageSkeleton";
+import LinkTabs from "@/app/components/ui/LinkTabs";
 import TeamOverview from "@/app/components/team/TeamOverview";
 import InternalRankings from "@/app/components/team/InternalRankings";
 import FinalRankings from "@/app/components/team/FinalRankings";
 import BestRoster from "@/app/components/team/BestRoster";
 import GroupMatchHistory from "@/app/components/team/GroupMatchHistory";
-import TeamAnalyticsTabs from "@/app/components/team/TeamAnalyticsTabs";
+import RukawaFiles from "@/app/components/team/RukawaFiles";
 import SyncTrigger from "@/app/components/SyncTrigger";
 
 export const revalidate = 900;
+export const metadata: Metadata = { title: "Team" };
 
-export default async function TeamPage() {
+type View = "overview" | "rukawa";
+
+const TABS = [
+  { value: "overview", label: "Overview", href: "/team", icon: BarChart3 },
+  { value: "rukawa", label: "The Rukawa Files", href: "/team?view=rukawa", icon: FileWarning },
+];
+
+async function OverviewView() {
   const puuids = users.map((u) => u.puuid);
-  const [
-    snapshots,
-    statsRows,
-    groupMatchCount,
-    groupWins,
-    cirRoleAverages,
-    version,
-    syncedAt,
-  ] = await Promise.all([
-    getAllRankedSnapshots(),
-    getAllPlayerStats(),
+  const [roster, groupCount, groupWins, groupMatches, cirRoleAverages, version] = await Promise.all([
+    loadRoster(),
     getGroupMatchCount(),
     getGroupMatchWins(),
+    getGroupMatches(),
     getCirRoleAverages(puuids),
     getDdragonVersion(),
-    getLatestSyncedAt(),
   ]);
-
-  const snapshotMap = new Map(
-    (snapshots as RankedSnapshot[]).map((s) => [s.puuid, s]),
-  );
-  const statsMap = new Map(
-    (statsRows as { puuid: string; gameName: string; statsJson: string }[]).map(
-      (r) => [r.puuid, r],
-    ),
-  );
-  const dbEmpty = snapshots.length === 0;
-
-  const playerStatsData = users.map((user) => {
-    const snap = snapshotMap.get(user.puuid);
-    const statsRow = statsMap.get(user.puuid);
-    const summoner: Summoner | null = snap?.summonerJson
-      ? JSON.parse(snap.summonerJson)
-      : null;
-    const stats: PlayerAggregatedStats | null = statsRow?.statsJson
-      ? JSON.parse(statsRow.statsJson)
-      : null;
-    return {
-      gameName: user.gameName,
-      profileIconId: summoner?.profileIconId ?? null,
-      stats: stats ?? EMPTY_STATS,
-    };
-  });
+  const players = roster.map((p) => ({ gameName: p.gameName, profileIconId: p.profileIconId, stats: p.stats }));
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-      <SyncTrigger dbEmpty={dbEmpty} syncedAt={syncedAt} />
-      <div className="space-y-8 stagger-children">
-        {/* Page Title */}
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Team Analytics
-          </h1>
-          <p className="mt-1 text-sm text-zinc-400">
-            Stack performance, internal rankings, and group match history
-          </p>
-        </div>
-
-        {/* Tab Switcher for Team Analytics vs Rukawa Files */}
-        <TeamAnalyticsTabs>
-          {/* Team Overview Stats */}
-          <TeamOverview
-            players={playerStatsData}
-            totalGroupMatches={groupMatchCount}
-            groupWins={groupWins}
-            version={version}
-          />
-
-          {/* Best Roster — highest avg CIR per role */}
-          <BestRoster
-            entries={cirRoleAverages}
-            players={playerStatsData.map((p) => ({
-              gameName: p.gameName,
-              profileIconId: p.profileIconId,
-            }))}
-            version={version}
-          />
-
-          {/* Final Rankings — avg position across all stat categories */}
-          <FinalRankings players={playerStatsData} version={version} />
-
-          {/* Internal Rankings (client component for sorting) */}
-          <InternalRankings players={playerStatsData} version={version} />
-
-          {/* Group Match History — fetches its own data client-side */}
-          <GroupMatchHistory />
-        </TeamAnalyticsTabs>
+    <div className="appear-children space-y-6">
+      <TeamOverview players={players} totalGroupMatches={groupCount} groupWins={groupWins} version={version} />
+      <BestRoster entries={cirRoleAverages} players={players} version={version} />
+      <div className="grid gap-6 2xl:grid-cols-2">
+        <FinalRankings players={players} version={version} />
+        <InternalRankings players={players} version={version} />
       </div>
-    </main>
+      <GroupMatchHistory rows={toGroupMatchRows(groupMatches)} />
+    </div>
+  );
+}
+
+async function RukawaView() {
+  return <RukawaFiles analytics={await getRukawaAnalytics()} />;
+}
+
+export default async function TeamPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  const [{ view: rawView }, syncedAt] = await Promise.all([searchParams, getLatestSyncedAt()]);
+  const view: View = rawView === "rukawa" ? "rukawa" : "overview";
+
+  return (
+    <div className="space-y-8">
+      <SyncTrigger dbEmpty={false} syncedAt={syncedAt} />
+      <PageHeader
+        eyebrow="Team"
+        title="Team analytics"
+        description="How we do together: stacked games, the ideal lineup and who ranks where."
+      />
+      <LinkTabs tabs={TABS} active={view} ariaLabel="Team views" />
+      <Suspense key={view} fallback={<PageSkeleton variant="content" />}>
+        {view === "rukawa" ? <RukawaView /> : <OverviewView />}
+      </Suspense>
+    </div>
   );
 }

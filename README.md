@@ -1,103 +1,61 @@
 # ETB to Challenger
 
-A **Next.js 16** dashboard that tracks a group of League of Legends players on their journey from their current rank to Challenger in **Flex Queue**. It pulls live data from the Riot Games API and presents ranked progress, match statistics, and team analytics in a modern dark-themed UI.
+A **Next.js 16** site that follows seven friends (`#ETB`) on their climb to Challenger in **Ranked Flex**. Match data is synced from the Riot Games API into Turso and presented as a dashboard, player profiles, team analytics, season records and awards — in a dark, desktop-first "Hextech ledger" design.
 
-## Features
+## Sections
 
-- **Challenge Progress** — Segmented progress bar showing the team's average LP from Iron to Challenger, with expandable per-player bars and rank emblems.
-- **Best of the Challenge** — Cards highlighting top performers across winrate, KDA, damage, kills, deaths, assists, kill participation, and best champion.
-- **LP Leaderboard** — Players ranked by total LP with hot-streak indicators.
-- **Winrate by Role** — Interactive leaderboard showing each player's winrate per role (Top, Jungle, Mid, ADC, Support).
-- **Player Cards** — Quick-glance cards with rank badge, winrate, and last match info.
-- **Player Detail Pages** — Full stats, sortable champion table, role performance breakdown, and paginated match history.
-- **Team Analytics** — Stack winrate, internal rankings, group match history, and team signature champions with icons.
-- **Season Filtering** — All stats are computed from Flex matches played since the 2026 season start (January 8, 2026). Older matches are excluded.
-- **Loading States** — Spinner loading screens for every route segment.
-- **Animations** — Staggered fade-in animations on page load, slide-down dropdowns, and smooth transitions throughout.
+- **Dashboard** (`/`) — team average on the ladder with every player pinned on an Iron → Challenger track; LP and wins still needed; one **Standings** table (rank, ladder LP, record, last game with CIR) filterable by role or stack size; CIR leaders per role; the **Divas** (who keeps queueing alone); best and worst of the challenge across 17 categories.
+- **Player** (`/player/[name]`) — splash-art banner with rank, winrate, CIR and KDA; role split; playstyle radar; season averages; champion pool; filterable, paginated match history.
+- **Match** (`/match/[id]`) — scoreline, MVP, both scoreboards with per-player CIR and items, team comparison.
+- **Team** (`/team`) — team and stacked-game totals, signature champions, best possible roster, final and internal rankings, every stacked game. `?view=rukawa` opens **The Rukawa Files**.
+- **Records** (`/records`) — single-game records and anti-records, pentakills; `?tab=cir` top/worst 15 CIR games per role; `?tab=delta` biggest CIR gaps vs team and lane.
+- **Awards** (`/awards`) — nominations per role and signature picks with podiums; `?tab=winners` the live frontrunners. Voting opens at season end.
 
-## Tech Stack
+## Stack
 
-| Layer     | Technology                                       |
-| --------- | ------------------------------------------------ |
-| Framework | Next.js 16 (App Router, React 19)                |
-| Language  | TypeScript                                       |
-| Styling   | Tailwind CSS 4                                   |
-| Icons     | Lucide React                                     |
-| Data      | Riot Games API (Account V1, League V4, Match V5) |
-| Assets    | DDragon (champion icons, profile icons)          |
+| Layer     | Technology                                             |
+| --------- | ------------------------------------------------------ |
+| Framework | Next.js 16 (App Router, Turbopack, React 19)           |
+| Language  | TypeScript                                             |
+| Styling   | Tailwind CSS 4 with design tokens in `app/globals.css` |
+| Fonts     | Geist, Geist Mono, Chakra Petch (`app/fonts.ts`)       |
+| Icons     | lucide-react                                           |
+| Data      | Turso (libSQL) ← Riot API (Account, League, Match V5)  |
+| Assets    | DDragon (champions, items, profile icons, splash art)  |
 
-## Getting Started
-
-### Prerequisites
-
-- **Node.js** 18+ and npm/yarn/pnpm
-- A **Riot Games API key** — get one at [developer.riotgames.com](https://developer.riotgames.com)
-
-### Installation
+## Getting started
 
 ```bash
-git clone <repo-url>
-cd etbtochallenger
 npm install
+npm run dev        # http://localhost:3000
+npm run build      # production build
+npm run lint
+npm test
 ```
 
-### Environment Variables
-
-Create a `.env` file in the project root:
+`.env` (no quotes around values):
 
 ```env
-RIOT_API_KEY=RGAPI-your-key-here
+RIOT_API_KEY=RGAPI-…
+TURSO_DATABASE_URL=libsql://…
+TURSO_AUTH_TOKEN=…
 ```
 
-> **Important:** Do not wrap the value in quotes — Next.js will include them literally.
-
-### Running
-
-```bash
-npm run dev        # Development server at http://localhost:3000
-npm run build      # Production build
-npm run start      # Start production server
-npm run lint       # Run ESLint
-```
+Without `TURSO_DATABASE_URL` the app uses a local SQLite file (`data/cache.db`).
 
 ## Documentation
 
-Detailed documentation is available in the [`docs/`](./docs/) folder:
-
-| Document                                     | Description                                                    |
-| -------------------------------------------- | -------------------------------------------------------------- |
-| [Architecture](./docs/architecture.md)       | Project structure, routing, and data flow                      |
-| [Riot API Integration](./docs/riot-api.md)   | Endpoints, authentication, rate limiting, and season filtering |
-| [Components](./docs/components.md)           | UI component reference with props                              |
-| [Data & Constants](./docs/data-constants.md) | LP math, tier colors, season config, and helper functions      |
-| [Adding Players](./docs/adding-players.md)   | How to add or remove tracked players                           |
-
-## Project Structure
-
-```
-app/
-├── api/matches/         # API route for paginated match loading
-├── components/
-│   ├── dashboard/       # ChallengeHeader, BestOfSection, Leaderboard, PlayerCard, RoleLeaderboard
-│   ├── player/          # PlayerHeader, AggregatedStats, ChampionStatsTable, RolePerformance, MatchHistoryList
-│   ├── team/            # TeamOverview, InternalRankings, GroupMatchHistory
-│   └── ui/              # Shared: ChampionIcon, KdaDisplay, NavHeader, ProgressBarSegmented, RankBadge, RankEmblem, Spinner, StatCard, WinrateBar
-├── data/
-│   ├── constants.ts     # LP math, tier colors, season epoch, queue IDs
-│   └── users.ts         # Tracked player list (puuids, game names)
-├── lib/
-│   ├── client.ts        # Riot API fetch wrapper with request tracking
-│   ├── endpoints.ts     # Riot API endpoint builders
-│   ├── helpers.ts       # Stats aggregation, LP conversion, Best-of computation
-│   ├── service.ts       # Data fetching orchestration (ranked, matches, dashboard)
-│   └── utils.ts         # cn() utility (clsx + tailwind-merge)
-├── player/[gameName]/   # Dynamic player detail page
-├── team/                # Team analytics page
-├── types/               # TypeScript interfaces (riot.ts, user.ts)
-├── globals.css          # Tailwind imports + custom animations
-├── layout.tsx           # Root layout with NavHeader
-└── page.tsx             # Dashboard (home page)
-```
+| Document                                     | What's in it                                          |
+| -------------------------------------------- | ----------------------------------------------------- |
+| [CLAUDE.md](./CLAUDE.md)                     | Project rules: architecture, design system, conventions |
+| [Architecture](./docs/architecture.md)       | Routes, data flow, caching                             |
+| [Components](./docs/components.md)           | UI primitives and feature components                   |
+| [Database](./docs/database.md)               | Turso schema and sync                                  |
+| [Riot API](./docs/riot-api.md)               | Endpoints, rate limits, season filtering               |
+| [Data & Constants](./docs/data-constants.md) | LP math, tier colours, season config                   |
+| [Match Details](./docs/match-details.md)     | The match page                                         |
+| [Adding Players](./docs/adding-players.md)   | Adding or removing tracked players                     |
+| [Debug API](./app/api/debug/README.md)       | Diagnostic endpoints                                   |
 
 ## License
 

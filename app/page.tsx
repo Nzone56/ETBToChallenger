@@ -1,34 +1,23 @@
+import { RefreshCw } from "lucide-react";
 import { getDdragonVersion } from "./lib/service";
 import {
-  getAllRankedSnapshots,
-  getAllPlayerStats,
+  getCirRoleAverages,
   getLastMatchByPuuid,
   getLatestSyncedAt,
-  getCirRoleAverages,
   getLoneWolfStats,
   getPlayerStackStats,
 } from "./lib/db";
-import {
-  computeAverageElo,
-  computeBestOfChallenge,
-  lpToTier,
-  EMPTY_STATS,
-} from "./lib/helpers";
-import { rankToLp } from "./data/constants";
+import { summarizeLastGame } from "./lib/lastGame";
+import { computeBestOfChallenge } from "./lib/ranking";
+import { loadRoster } from "./lib/roster";
 import { users } from "./data/users";
-import type {
-  RankTier,
-  Summoner,
-  LeagueEntry,
-  PlayerAggregatedStats,
-  Match,
-} from "./types/riot";
-import ChallengeHeader from "./components/dashboard/ChallengeHeader";
-import Leaderboard from "./components/dashboard/Leaderboard";
-import PlayerCard from "./components/dashboard/PlayerCard";
+import type { Match } from "./types/riot";
+import ChallengeHero from "./components/dashboard/ChallengeHero";
 import BestOfSection from "./components/dashboard/BestOfSection";
-import RoleCirLeaderboard from "./components/dashboard/RoleCirLeaderboard";
 import LoneWolf from "./components/dashboard/LoneWolf";
+import RoleCirLeaderboard from "./components/dashboard/RoleCirLeaderboard";
+import Standings from "./components/dashboard/Standings";
+import EmptyState from "./components/ui/EmptyState";
 import SyncTrigger from "./components/SyncTrigger";
 
 // Revalidate every 15 minutes — unstable_cache prevents redundant DB reads
@@ -36,182 +25,64 @@ export const revalidate = 900;
 
 export default async function Home() {
   const puuids = users.map((u) => u.puuid);
-  const [
-    snapshots,
-    statsRows,
-    lastMatches,
-    cirRoleAverages,
-    loneWolfStats,
-    stackStats,
-    version,
-    syncedAt,
-  ] = await Promise.all([
-    getAllRankedSnapshots(),
-    getAllPlayerStats(),
-    Promise.all(users.map((u) => getLastMatchByPuuid(u.puuid))),
-    getCirRoleAverages(puuids),
-    getLoneWolfStats(puuids),
-    getPlayerStackStats(puuids),
+  const [roster, lastMatches, version, syncedAt] = await Promise.all([
+    loadRoster(),
+    Promise.all(puuids.map((id) => getLastMatchByPuuid(id) as Promise<Match | null>)),
     getDdragonVersion(),
     getLatestSyncedAt(),
   ]);
+  // These read every season match. Run together on a cold cache they exceed
+  // Turso's response memory ("Resource exhausted"), so they go one at a time.
+  // Once cached (15 min) they cost nothing.
+  const cirRoleAverages = await getCirRoleAverages(puuids);
+  const loneWolfStats = await getLoneWolfStats(puuids);
+  const stackStats = await getPlayerStackStats(puuids);
 
-  const snapshotMap = new Map(snapshots.map((s) => [s.puuid, s]));
-  const statsMap = new Map(statsRows.map((r) => [r.puuid, r]));
-  const lastMatchMap = new Map(
-    users.map((u, i) => [u.puuid, lastMatches[i] as Match | null]),
-  );
-  const dbEmpty = snapshots.length === 0;
+  const dbEmpty = roster.every((p) => !p.flexEntry && !p.hasStats);
 
-  // Build dashboard data from DB (0 Riot calls)
-  const dashboardData = users.map((user) => {
-    const snap = snapshotMap.get(user.puuid);
-    const summoner: Summoner | null = snap?.summonerJson
-      ? JSON.parse(snap.summonerJson)
-      : null;
-    const flexEntry: LeagueEntry | null = snap?.flexEntryJson
-      ? JSON.parse(snap.flexEntryJson)
-      : null;
-    return {
-      puuid: user.puuid,
-      gameName: user.gameName,
-      tagLine: user.tagLine,
-      summoner,
-      flexEntry,
-      lastMatch: lastMatchMap.get(user.puuid) ?? null,
-    };
-  });
+  if (dbEmpty) {
+    return (
+      <>
+        <SyncTrigger dbEmpty syncedAt={syncedAt} />
+        <EmptyState
+          size="full"
+          icon={RefreshCw}
+          title="Syncing for the first time…"
+          description="Pulling every Flex game this season from Riot. This takes a few minutes; the page refreshes itself when it's done."
+        />
+      </>
+    );
+  }
 
-  const playerStatsData = users.map((user) => {
-    const snap = snapshotMap.get(user.puuid);
-    const statsRow = statsMap.get(user.puuid);
-    const summoner: Summoner | null = snap?.summonerJson
-      ? JSON.parse(snap.summonerJson)
-      : null;
-    const stats: PlayerAggregatedStats | null = statsRow?.statsJson
-      ? JSON.parse(statsRow.statsJson)
-      : null;
-    return {
-      gameName: user.gameName,
-      profileIconId: summoner?.profileIconId ?? null,
-      stats: stats ?? EMPTY_STATS,
-    };
-  });
+  const lastGames = Object.fromEntries(puuids.map((id, i) => [id, summarizeLastGame(lastMatches[i], id)]));
+  const iconMap = new Map(roster.map((p) => [p.puuid, p.profileIconId]));
+  const playersWithGames = roster.filter((p) => p.stats.totalGames > 0);
+  const bestOf = playersWithGames.length > 0 ? computeBestOfChallenge(playersWithGames) : null;
 
-  const eligibleForBestOf = playerStatsData.filter(
-    (p) => p.stats && (p.stats as PlayerAggregatedStats).totalGames > 0,
-  ) as {
-    gameName: string;
-    stats: PlayerAggregatedStats;
-    profileIconId: number | null;
-  }[];
-
-  const bestOf =
-    eligibleForBestOf.length > 0
-      ? computeBestOfChallenge(eligibleForBestOf)
-      : null;
-
-  // Enrich lone wolf entries with profile icon from snapshot
-  const enrichedLoneWolfStats = loneWolfStats.map((entry) => {
-    const snap = snapshotMap.get(entry.puuid);
-    const summoner: Summoner | null = snap?.summonerJson
-      ? JSON.parse(snap.summonerJson)
-      : null;
-    return { ...entry, profileIconId: summoner?.profileIconId ?? null };
-  });
-
-  const { avgLp, avgTierLabel } = computeAverageElo(
-    dashboardData.map((p) => p.flexEntry),
-  );
-
-  const playerLpData = dashboardData.map((p) => {
-    const totalLp = p.flexEntry
-      ? rankToLp(p.flexEntry.tier, p.flexEntry.rank, p.flexEntry.leaguePoints)
-      : 0;
-    return {
-      gameName: p.gameName,
-      totalLp,
-      tierLabel: p.flexEntry
-        ? `${p.flexEntry.tier.charAt(0)}${p.flexEntry.tier.slice(1).toLowerCase()} ${p.flexEntry.rank}`
-        : "Unranked",
-      tier: (p.flexEntry?.tier ?? lpToTier(totalLp)) as RankTier,
-    };
-  });
-
+  // Read top to bottom the way you'd ask: where are we, who's where, who's
+  // carrying each role, who's off playing alone, and the season superlatives.
+  // Every row is full-width or an equal-height pair, so nothing leaves a hole.
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Background sync trigger — fires after render, no blocking */}
-      <SyncTrigger dbEmpty={dbEmpty} syncedAt={syncedAt} />
+    <div className="appear-children space-y-6">
+      <SyncTrigger dbEmpty={false} syncedAt={syncedAt} />
 
-      <div className="space-y-8 stagger-children">
-        {dbEmpty ? (
-          <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-center">
-            <p className="text-lg font-semibold text-zinc-300">
-              Syncing data for the first time…
-            </p>
-            <p className="text-sm text-zinc-500">
-              This takes a few minutes on first load. The page will refresh
-              automatically.
-            </p>
-          </div>
-        ) : (
-          <>
-            <ChallengeHeader
-              avgLp={avgLp}
-              avgTierLabel={avgTierLabel}
-              avgTier={lpToTier(avgLp) as RankTier}
-              playerCount={dashboardData.length}
-              players={playerLpData}
-            />
+      <ChallengeHero roster={roster} version={version} />
 
-            {bestOf && <BestOfSection best={bestOf} />}
+      <Standings players={roster} stackStats={stackStats} lastGames={lastGames} version={version} />
 
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-1 space-y-4">
-                <Leaderboard
-                  players={dashboardData.map((p) => ({
-                    ...p,
-                    stats: statsMap.get(p.puuid)
-                      ? JSON.parse(statsMap.get(p.puuid)!.statsJson)
-                      : EMPTY_STATS,
-                  }))}
-                  stackStats={stackStats}
-                  version={version}
-                />
-                <LoneWolf entries={enrichedLoneWolfStats} version={version} />
-                <RoleCirLeaderboard
-                  entries={cirRoleAverages}
-                  players={playerStatsData.map((p) => ({
-                    gameName: p.gameName,
-                    profileIconId: p.profileIconId,
-                  }))}
-                  version={version}
-                />
-              </div>
-              <div className="lg:col-span-2">
-                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-                  Player Cards
-                </h2>
-                <div className="grid grid-cols-1 gap-3 stagger-grid">
-                  {dashboardData.map((player) => {
-                    const playerStats = statsMap.get(player.puuid)
-                      ? JSON.parse(statsMap.get(player.puuid)!.statsJson)
-                      : EMPTY_STATS;
-                    return (
-                      <PlayerCard
-                        key={player.puuid}
-                        player={player}
-                        stats={playerStats}
-                        version={version}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
+        <RoleCirLeaderboard
+          entries={cirRoleAverages}
+          players={roster.map((p) => ({ gameName: p.gameName, profileIconId: p.profileIconId }))}
+          version={version}
+        />
+        <LoneWolf
+          entries={loneWolfStats.map((e) => ({ ...e, profileIconId: iconMap.get(e.puuid) ?? null }))}
+          version={version}
+        />
       </div>
-    </main>
+
+      {bestOf && <BestOfSection best={bestOf} />}
+    </div>
   );
 }

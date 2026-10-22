@@ -1,8 +1,10 @@
-import { PlayerAggregatedStats } from "@/app/types/riot";
-import { formatWinrate } from "@/app/lib/helpers";
-import StatCard from "@/app/components/ui/StatCard";
+import { Shield, Swords, Target, Users } from "lucide-react";
 import ChampionIcon from "@/app/components/ui/ChampionIcon";
-import { Users, Swords, Shield, Target } from "lucide-react";
+import { Panel, PanelHeader } from "@/app/components/ui/Panel";
+import StatTile from "@/app/components/ui/StatTile";
+import { formatWinrate } from "@/app/lib/format";
+import { cn } from "@/app/lib/utils";
+import { PlayerAggregatedStats } from "@/app/types/riot";
 
 interface TeamOverviewProps {
   players: { gameName: string; stats: PlayerAggregatedStats }[];
@@ -11,93 +13,54 @@ interface TeamOverviewProps {
   version: string;
 }
 
-export default function TeamOverview({
-  players,
-  totalGroupMatches,
-  groupWins,
-  version,
-}: TeamOverviewProps) {
-  // Team-wide totals
+/** Team-wide totals, stacked vs. not, and the champions the team leans on. */
+export default function TeamOverview({ players, totalGroupMatches, groupWins, version }: TeamOverviewProps) {
   const totalGames = players.reduce((s, p) => s + p.stats.totalGames, 0);
   const totalWins = players.reduce((s, p) => s + p.stats.wins, 0);
   const teamWinrate = totalGames > 0 ? (totalWins / totalGames) * 100 : 0;
+  const groupWinrate = totalGroupMatches > 0 ? (groupWins / totalGroupMatches) * 100 : 0;
 
-  // Team signature champions (most played across all players)
   const champTotals = new Map<string, { games: number; wins: number }>();
   for (const { stats } of players) {
-    for (const champ of stats.championStats) {
-      const existing = champTotals.get(champ.championName) ?? {
-        games: 0,
-        wins: 0,
-      };
-      existing.games += champ.games;
-      existing.wins += champ.wins;
-      champTotals.set(champ.championName, existing);
+    for (const c of stats.championStats) {
+      const t = champTotals.get(c.championName) ?? { games: 0, wins: 0 };
+      t.games += c.games;
+      t.wins += c.wins;
+      champTotals.set(c.championName, t);
     }
   }
-  const signatureChamps = Array.from(champTotals.entries())
+  const signature = [...champTotals.entries()]
     .map(([name, d]) => ({ name, ...d, winrate: (d.wins / d.games) * 100 }))
     .sort((a, b) => b.games - a.games)
-    .slice(0, 5);
-
-  const groupWinrate =
-    totalGroupMatches > 0 ? (groupWins / totalGroupMatches) * 100 : 0;
+    .slice(0, 6);
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard
-          label="Team Games"
-          value={totalGames}
-          sublabel={`${totalWins}W ${totalGames - totalWins}L`}
-          icon={<Users className="h-3.5 w-3.5" />}
-        />
-        <StatCard
-          label="Team Winrate"
-          value={formatWinrate(teamWinrate)}
-          sublabel="Individual avg"
-          icon={<Target className="h-3.5 w-3.5" />}
-        />
-        <StatCard
-          label="Stack Games"
-          value={totalGroupMatches}
-          sublabel={`${groupWins}W ${totalGroupMatches - groupWins}L`}
-          icon={<Shield className="h-3.5 w-3.5" />}
-        />
-        <StatCard
-          label="Stack Winrate"
-          value={formatWinrate(groupWinrate)}
-          sublabel="When 2+ play together"
-          icon={<Swords className="h-3.5 w-3.5" />}
-        />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile icon={Users} label="Team games" value={totalGames} sub={`${totalWins}W ${totalGames - totalWins}L`} />
+        <StatTile icon={Target} label="Team winrate" value={formatWinrate(teamWinrate)} sub="Every game, every player" valueClassName={teamWinrate >= 50 ? "text-win" : "text-loss"} />
+        <StatTile icon={Shield} label="Stacked games" value={totalGroupMatches} sub={`${groupWins}W ${totalGroupMatches - groupWins}L`} />
+        <StatTile icon={Swords} label="Stacked winrate" value={formatWinrate(groupWinrate)} sub="Two or more of us in the game" valueClassName={groupWinrate >= 50 ? "text-win" : "text-loss"} />
       </div>
 
-      {/* Signature Champions */}
-      {signatureChamps.length > 0 && (
-        <div>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Team Signature Champions
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {signatureChamps.map((champ) => (
-              <div
-                key={champ.name}
-                className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm"
-              >
-                <ChampionIcon
-                  championName={champ.name}
-                  version={version}
-                  size={24}
-                />
-                <span className="font-medium text-zinc-200">{champ.name}</span>
-                <span className="ml-1 text-xs text-zinc-500">
-                  {champ.games}G · {formatWinrate(champ.winrate)}
-                </span>
+      {signature.length > 0 && (
+        <Panel>
+          <PanelHeader title="Signature champions" description="Most played across the roster" />
+          <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 xl:grid-cols-6">
+            {signature.map((c) => (
+              <div key={c.name} className="flex items-center gap-3 rounded-lg border border-border bg-raised/60 p-3">
+                <ChampionIcon championName={c.name} version={version} size={40} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{c.name}</p>
+                  <p className="num text-xs text-muted-foreground">
+                    {c.games}G ·{" "}
+                    <span className={cn(c.winrate >= 50 ? "text-win" : "text-loss")}>{formatWinrate(c.winrate)}</span>
+                  </p>
+                </div>
               </div>
             ))}
           </div>
-        </div>
+        </Panel>
       )}
     </div>
   );
