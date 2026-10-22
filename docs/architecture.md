@@ -46,7 +46,7 @@ Riot API → lib/sync.ts → Turso → lib/db.ts (unstable_cache, tag "db", 15 m
 
 ## Turso limits
 
-Several queries read every season match's JSON. Running many at once returns `Resource exhausted: mem_hrana_response`, so `next.config.ts` prerenders with a single worker (`experimental.cpus: 1`). Cache any new "read every match" query.
+Several queries read every season match's JSON. Running many at once returns `Resource exhausted: mem_hrana_response`, so DB-backed routes are `force-dynamic` and the build never queries Turso. Cache any new "read every match" query.
 
 ## Components
 

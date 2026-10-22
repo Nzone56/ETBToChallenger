@@ -62,7 +62,8 @@ Riot API ──▶ lib/sync.ts ──▶ Turso ──▶ lib/db.ts (unstable_cac
   and let the client pick the icon (`AwardBoard kind="players"`).
 - **Turso load.** Several queries pull every season match's JSON. Run many at
   once and Turso answers `Resource exhausted: mem_hrana_response`. That's why
-  `next.config.ts` builds with `experimental.cpus: 1`, and the dashboard runs
+  DB-backed routes are `force-dynamic` so the build never queries Turso (on
+  Vercel a cold build hit the limit), and the dashboard runs
   its heavy reads one at a time. When a query only needs a few fields, let
   Turso extract them (`json_extract(m.data, '$.info.gameDuration')`) instead
   of returning whole match JSON — see `getLoneWolfStats`. Don't add another
