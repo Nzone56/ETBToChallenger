@@ -1,23 +1,14 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import NavHeader from "./components/ui/NavHeader";
-import Spinner from "./components/ui/Spinner";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { display, mono, sans } from "./fonts";
+import AppShell from "./components/layout/AppShell";
 
 export const metadata: Metadata = {
-  title: "ETB to Challenger",
-  description: "Road to Challenger challenge tracker for Flex Queue",
+  title: {
+    default: "ETB to Challenger",
+    template: "%s · ETB to Challenger",
+  },
+  description: "Seven friends, one Flex queue, one goal: Challenger.",
   icons: {
     icon: "/chall.png",
     apple: "/chall.png",
@@ -30,20 +21,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-[#09090b] text-zinc-50`}
-      >
-        <NavHeader />
-        <Suspense
-          fallback={
-            <main className="flex min-h-[60vh] items-center justify-center">
-              <Spinner size="lg" label="Loading..." />
-            </main>
-          }
-        >
-          {children}
-        </Suspense>
+    <html
+      lang="en"
+      className={`${sans.variable} ${mono.variable} ${display.variable}`}
+    >
+      <body>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

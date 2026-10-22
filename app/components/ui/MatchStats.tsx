@@ -1,48 +1,29 @@
-import { Coins, Crosshair, Target } from "lucide-react";
+import { Coins, Crosshair, Wheat } from "lucide-react";
+import { formatCompact } from "@/app/lib/format";
+import { cn } from "@/app/lib/utils";
 
 interface MatchStatsProps {
   cs: number;
   gold: number;
   damage: number;
-  size?: "sm" | "md";
+  className?: string;
 }
 
-export default function MatchStats({
-  cs,
-  gold,
-  damage,
-  size = "md",
-}: MatchStatsProps) {
-  const textSize = size === "sm" ? "text-[10px]" : "text-xs";
-  const iconSize = size === "sm" ? 10 : 12;
-
-  const formatNumber = (num: number) => {
-    if (num >= 1000) {
-      return `${(num / 1000).toFixed(1)}k`;
-    }
-    return num.toString();
-  };
-
+/** CS · gold · damage, one compact line under a match. */
+export default function MatchStats({ cs, gold, damage, className }: MatchStatsProps) {
+  const items = [
+    { icon: Wheat, value: cs.toString(), label: "CS" },
+    { icon: Coins, value: formatCompact(gold), label: "Gold" },
+    { icon: Crosshair, value: formatCompact(damage), label: "Damage" },
+  ];
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex items-center gap-1">
-        <Target className="text-zinc-500" size={iconSize} />
-        <span className={`${textSize} font-medium text-zinc-400`}>
-          {cs}
+    <div className={cn("num flex items-center gap-3 text-xs text-muted-foreground", className)}>
+      {items.map(({ icon: Icon, value, label }) => (
+        <span key={label} className="flex items-center gap-1" title={label}>
+          <Icon className="size-3 text-faint" />
+          {value}
         </span>
-      </div>
-      <div className="flex items-center gap-1">
-        <Coins className="text-zinc-500" size={iconSize} />
-        <span className={`${textSize} font-medium text-zinc-400`}>
-          {formatNumber(gold)}
-        </span>
-      </div>
-      <div className="flex items-center gap-1">
-        <Crosshair className="text-zinc-500" size={iconSize} />
-        <span className={`${textSize} font-medium text-zinc-400`}>
-          {formatNumber(damage)}
-        </span>
-      </div>
+      ))}
     </div>
   );
 }

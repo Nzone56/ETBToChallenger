@@ -1,63 +1,49 @@
+import { cn } from "@/app/lib/utils";
+import type { MatchParticipant } from "@/app/types/riot";
+
+type ItemSlots = Pick<
+  MatchParticipant,
+  "item0" | "item1" | "item2" | "item3" | "item4" | "item5" | "item6"
+>;
+
 interface ItemsDisplayProps {
-  item0: number;
-  item1: number;
-  item2: number;
-  item3: number;
-  item4: number;
-  item5: number;
-  item6: number;
+  participant: ItemSlots;
   version: string;
   size?: "sm" | "md";
+  className?: string;
 }
 
+function itemUrl(id: number, version: string) {
+  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${id}.png`;
+}
+
+/** Six item slots plus the trinket, which wears a gold ring. */
 export default function ItemsDisplay({
-  item0,
-  item1,
-  item2,
-  item3,
-  item4,
-  item5,
-  item6,
+  participant: p,
   version,
   size = "md",
+  className,
 }: ItemsDisplayProps) {
-  const regularItems = [item0, item1, item2, item3, item4, item5];
-  const trinket = item6;
-
-  const itemSize = size === "sm" ? "h-6 w-6" : "h-7 w-7";
-  const imgSize = size === "sm" ? 24 : 28;
+  const items = [p.item0, p.item1, p.item2, p.item3, p.item4, p.item5];
+  const box = size === "sm" ? "size-6" : "size-7";
 
   return (
-    <div className="flex gap-0.5">
-      {regularItems.map((itemId, i) => (
+    <div className={cn("flex gap-0.5", className)}>
+      {items.map((id, i) => (
         <div
           key={i}
-          className={`${itemSize} rounded border border-zinc-700/60 bg-zinc-800/40 overflow-hidden shrink-0`}
+          className={cn(box, "shrink-0 overflow-hidden rounded-sm bg-muted ring-1 ring-border")}
         >
-          {itemId > 0 && (
-            <img
-              src={`https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemId}.png`}
-              alt={`Item ${itemId}`}
-              width={imgSize}
-              height={imgSize}
-              className="h-full w-full object-cover"
-              loading="lazy"
-            />
+          {id > 0 && (
+            <img src={itemUrl(id, version)} alt="" className="size-full" loading="lazy" />
           )}
         </div>
       ))}
-      {trinket > 0 && (
+      {p.item6 > 0 && (
         <div
-          className={`${itemSize} rounded border border-amber-600/40 bg-amber-900/10 overflow-hidden shrink-0`}
+          className={cn(box, "ml-1 shrink-0 overflow-hidden rounded-full ring-1 ring-primary/40")}
         >
-          <img
-            src={`https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${trinket}.png`}
-            alt={`Trinket ${trinket}`}
-            width={imgSize}
-            height={imgSize}
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
+          <img src={itemUrl(p.item6, version)} alt="" className="size-full" loading="lazy" />
         </div>
       )}
     </div>

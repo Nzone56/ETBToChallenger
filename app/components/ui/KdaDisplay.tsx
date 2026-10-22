@@ -8,6 +8,9 @@ interface KdaDisplayProps {
   size?: "sm" | "md" | "lg";
 }
 
+const SIZES = { sm: "text-xs", md: "text-sm", lg: "text-base" };
+
+/** K / D / A with deaths in loss red. */
 export default function KdaDisplay({
   kills,
   deaths,
@@ -15,19 +18,13 @@ export default function KdaDisplay({
   className,
   size = "md",
 }: KdaDisplayProps) {
-  const sizeStyles = {
-    sm: "text-xs",
-    md: "text-sm",
-    lg: "text-base",
-  };
-
   return (
-    <span className={cn("font-medium", sizeStyles[size], className)}>
-      <span className="text-zinc-100">{kills}</span>
-      <span className="text-zinc-500"> / </span>
-      <span className="text-red-400">{deaths}</span>
-      <span className="text-zinc-500"> / </span>
-      <span className="text-zinc-100">{assists}</span>
+    <span className={cn("num whitespace-nowrap font-medium", SIZES[size], className)}>
+      <span className="text-foreground">{kills}</span>
+      <span className="text-faint"> / </span>
+      <span className="text-loss">{deaths}</span>
+      <span className="text-faint"> / </span>
+      <span className="text-foreground">{assists}</span>
     </span>
   );
 }

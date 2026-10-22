@@ -5,11 +5,12 @@ import { ArrowLeft } from "lucide-react";
 export const GoBackButton = () => {
   return (
     <button
+      type="button"
       onClick={() => window.history.back()}
-      className="mb-5 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400 transition-colors hover:text-zinc-200 cursor-pointer"
+      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 -ml-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
     >
-      <ArrowLeft className="h-3.5 w-3.5" />
-      Go Back
+      <ArrowLeft className="size-3.5" />
+      Back
     </button>
   );
 };

@@ -45,3 +45,48 @@ export const REMAKE_THRESHOLD_SECONDS = 300;
 export function isRemake(gameDurationSeconds: number): boolean {
   return gameDurationSeconds < REMAKE_THRESHOLD_SECONDS;
 }
+
+// ─── Match result ───
+export type MatchResult = "win" | "loss" | "remake";
+
+export function matchResult(
+  gameDurationSeconds: number,
+  win: boolean,
+): MatchResult {
+  if (isRemake(gameDurationSeconds)) return "remake";
+  return win ? "win" : "loss";
+}
+
+// ─── Display formatting ───
+
+/** 1834 → "30:34" */
+export function formatDuration(gameDurationSeconds: number): string {
+  const m = Math.floor(gameDurationSeconds / 60);
+  const s = Math.floor(gameDurationSeconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/** 12345 → "12,345" */
+export function formatNumber(value: number): string {
+  return Math.round(value).toLocaleString("en-US");
+}
+
+/** 12345 → "12.3k" */
+export function formatCompact(value: number): string {
+  if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  return Math.round(value).toString();
+}
+
+/** 450 → "+450", -120 → "-120" */
+export function formatSigned(value: number, decimals = 0): string {
+  const sign = value >= 0 ? "+" : "";
+  return decimals > 0
+    ? `${sign}${value.toFixed(decimals)}`
+    : `${sign}${formatNumber(value)}`;
+}
+
+/** "EMERALD" + "II" → "Emerald II" */
+export function formatTier(tier: string, division?: string): string {
+  const name = tier.charAt(0) + tier.slice(1).toLowerCase();
+  return division ? `${name} ${division}` : name;
+}

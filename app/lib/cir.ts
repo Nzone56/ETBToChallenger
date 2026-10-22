@@ -1,3 +1,5 @@
+import type { MatchParticipant } from "../types/riot";
+
 /**
  * Competitive Impact Rating (CIR)
  */
@@ -50,8 +52,8 @@ export interface CIRResult {
  *
  *  ECONOMY  = resource lead (normalized, capped to prevent stomp explosion)
  *             (GPM / MaxGPM) × 10  +  CsPerMin × 1.5
- *             GoldLead is CAPPED at ±3000 so a 10k stomp doesn't inflate
- *             the score 3× vs a close game
+ *             GoldLead (and DmgLead in Pressure) is CAPPED at ±5000 so a
+ *             10k stomp doesn't inflate the score vs a close game
  *
  *  PRESSURE = MAP pressure (completely separate from dealing damage)
  *             TeamDmg% (share of team output) + DmgToBuildings
@@ -71,8 +73,8 @@ export interface CIRResult {
  *  TOP        |  0.35  |  0.10   |  0.20   |  0.35
  *  JUNGLE     |  0.30  |  0.20   |  0.15   |  0.35
  *  MIDDLE     |  0.40  |  0.15   |  0.25   |  0.20
- *  BOTTOM/ADC |  0.40  |  0.05   |  0.40   |  0.15
- *  UTILITY    |  0.10  |  0.60   |  0.10   |  0.20
+ *  BOTTOM/ADC |  0.50  |  0.05   |  0.35   |  0.10
+ *  UTILITY    |  0.30  |  0.50   |  0.15   |  0.05
  *
  * Requires: `teamPosition`, `maxGameGoldPerMin`, `teamDamagePercent`
  */
@@ -142,7 +144,7 @@ export function computeCIR_v3(
     (input.firstBloodParticipation > 0 ? 2 : 0); // flat FB bonus  → 0 or 2
 
   // ── Economy ────────────────────────────────────────────────────────────────
-  // GPM normalized to max in game. GoldLead capped ±3000 → ±5 pts.
+  // GPM normalized to max in game. GoldLead capped ±5000 → ±8 pts (±10 for support).
   // Can go negative if gold deficit is severe.
   const goldLeadCapped = Math.max(-5000, Math.min(5000, input.goldLead));
   const economy = isSupport
@@ -221,4 +223,55 @@ export function statsToCircInput(
     maxGameGoldPerMin: extras?.maxGameGoldPerMin,
     teamDamagePercent: extras?.teamDamagePercent,
   };
+}
+
+/**
+ * CIR of one participant in one match — the single place that turns a Riot
+ * participant row into a `CIRInput`. Every view that shows a per-game CIR
+ * (match tables, history rows, MVP, last-match cards, awards) goes through
+ * here so the inputs can never drift between screens.
+ */
+export function computeParticipantCir(
+  match: {
+    info: {
+      gameDuration: number;
+      participants: MatchParticipant[];
+    };
+  },
+  p: MatchParticipant,
+): CIRResult & { role: string; weights: RoleWeights } {
+  const participants = match.info.participants;
+  const dur = match.info.gameDuration / 60;
+  const perMin = (v: number) => (dur > 0 ? v / dur : 0);
+
+  const team = participants.filter((tp) => tp.teamId === p.teamId);
+  const teamKills = team.reduce((s, tp) => s + tp.kills, 0);
+  const teamDmg = team.reduce((s, tp) => s + tp.totalDamageDealtToChampions, 0);
+  const maxGPM = Math.max(...participants.map((pt) => perMin(pt.goldEarned)));
+  const opponent = participants.find(
+    (op) => op.teamId !== p.teamId && op.teamPosition === p.teamPosition,
+  );
+
+  return computeCIR_v3({
+    kills: p.kills,
+    deaths: p.deaths,
+    assists: p.assists,
+    killParticipation:
+      teamKills > 0 ? ((p.kills + p.assists) / teamKills) * 100 : 0,
+    visionPerMin: perMin(p.visionScore),
+    dmgToObjectives: p.damageDealtToObjectives ?? 0,
+    firstBloodParticipation: p.firstBloodKill || p.firstBloodAssist ? 100 : 0,
+    goldPerMin: perMin(p.goldEarned),
+    csPerMin: perMin(p.totalMinionsKilled + p.neutralMinionsKilled),
+    goldLead: opponent ? p.goldEarned - opponent.goldEarned : 0,
+    dmgPerMin: perMin(p.totalDamageDealtToChampions),
+    dmgToBuildings: p.damageDealtToBuildings ?? 0,
+    dmgLead: opponent
+      ? p.totalDamageDealtToChampions - opponent.totalDamageDealtToChampions
+      : 0,
+    teamDamagePercent:
+      teamDmg > 0 ? (p.totalDamageDealtToChampions / teamDmg) * 100 : 0,
+    maxGameGoldPerMin: maxGPM,
+    teamPosition: p.teamPosition,
+  });
 }

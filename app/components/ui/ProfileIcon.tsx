@@ -1,3 +1,4 @@
+import { User } from "lucide-react";
 import { cn } from "@/app/lib/utils";
 import { getProfileIconUrl } from "@/app/data/constants";
 
@@ -5,37 +6,38 @@ interface ProfileIconProps {
   iconId: number | null | undefined;
   version: string;
   size?: number;
+  /** Ring colour for data-driven identity (e.g. a tier colour) */
+  ringColor?: string;
   className?: string;
 }
 
+/** A player's in-game profile icon — the app's avatar. */
 export default function ProfileIcon({
   iconId,
   version,
   size = 32,
+  ringColor,
   className,
 }: ProfileIconProps) {
+  const dims = {
+    width: size,
+    height: size,
+    ...(ringColor ? { "--tw-ring-color": ringColor } : {}),
+  } as React.CSSProperties;
+
+  const base = cn(
+    "shrink-0 rounded-full bg-muted ring-1 ring-border-strong",
+    className,
+  );
+
   if (!iconId) {
     return (
       <div
-        className={cn(
-          "shrink-0 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-600",
-          className,
-        )}
-        style={{ width: size, height: size }}
+        className={cn(base, "flex items-center justify-center text-faint")}
+        style={dims}
+        aria-hidden
       >
-        <svg
-          width={size * 0.5}
-          height={size * 0.5}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-          <circle cx="12" cy="7" r="4" />
-        </svg>
+        <User style={{ width: size * 0.5, height: size * 0.5 }} />
       </div>
     );
   }
@@ -43,10 +45,11 @@ export default function ProfileIcon({
   return (
     <img
       src={getProfileIconUrl(iconId, version)}
-      alt="Profile icon"
+      alt=""
       width={size}
       height={size}
-      className={cn("shrink-0 rounded-full", className)}
+      style={dims}
+      className={base}
       loading="lazy"
     />
   );

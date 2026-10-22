@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPlayerStats } from "@/app/lib/db";
+import type { PlayerAggregatedStats } from "@/app/types/riot";
 
 // GET /api/player-champions?puuid=X
 // Returns all unique champion names a player has used this season
@@ -12,13 +13,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const stats = (await getPlayerStats(puuid)) as any;
+    const stats = (await getPlayerStats(puuid)) as PlayerAggregatedStats | null;
     if (!stats || !stats.championStats) {
       return NextResponse.json({ champions: [] });
     }
 
     const champions = stats.championStats
-      .map((c: any) => c.championName)
+      .map((c) => c.championName)
       .sort();
 
     return NextResponse.json({ champions });

@@ -1,4 +1,5 @@
-import { getDb, ensureSchema } from "./db";
+import { unstable_cache } from "next/cache";
+import { getDb, ensureSchema, DB_TAG } from "./db";
 import { SEASON_START_EPOCH, QUEUE_FLEX } from "../data/constants";
 import { users } from "../data/users";
 import { Match } from "../types/riot";
@@ -62,7 +63,7 @@ export interface RukawaAnalytics {
   totalSeasonGames: number;
 }
 
-export async function getRukawaAnalytics(): Promise<RukawaAnalytics> {
+async function computeRukawaAnalytics(): Promise<RukawaAnalytics> {
   await ensureSchema();
   const db = getDb();
 
@@ -625,3 +626,11 @@ export async function getRukawaAnalytics(): Promise<RukawaAnalytics> {
     totalSeasonGames,
   };
 }
+
+// Small result over every season match — cached with the rest of the DB reads
+// and invalidated by the same tag after each sync.
+export const getRukawaAnalytics = unstable_cache(
+  computeRukawaAnalytics,
+  ["rukawa-analytics"],
+  { tags: [DB_TAG], revalidate: 900 },
+);

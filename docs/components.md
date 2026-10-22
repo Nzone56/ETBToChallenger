@@ -1,170 +1,59 @@
-# Components Reference
+# Components
 
-## Dashboard Components (`components/dashboard/`)
+Design rules (tokens, type, radius, motion, layout) live in [`CLAUDE.md` §4](../CLAUDE.md). This is the map of what exists.
 
-### ChallengeHeader
+## Shell — `components/layout/`
 
-Displays the team's overall challenge progress with an expandable per-player section.
+| Component                | Notes                                                                 |
+| ------------------------ | --------------------------------------------------------------------- |
+| `AppShell`               | Fixed sidebar (≥ `lg`) or top bar + drawer; content column `max-w-app` |
+| `NavPanel`               | Sidebar body, shared by desktop sidebar and mobile drawer             |
+| `NavLinks` (client)      | Section links with active state (`nav.ts` lists them)                 |
+| `RosterNav` → `RosterNavList` (client) | Players by ladder position, streamed                   |
+| `SyncStatus`             | Season label and last sync time, streamed                             |
+| `MobileNav` (client)     | Top bar + drawer; closes on navigation and Escape                     |
+| `Brand`, `PageHeader`, `PageSkeleton` | Wordmark, page heading, route loading state              |
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `avgLp` | `number` | Team average LP |
-| `avgTierLabel` | `string` | Formatted tier label (e.g. "Emerald II") |
-| `avgTier` | `RankTier` | Tier key for rank emblem |
-| `playerCount` | `number` | Number of tracked players |
-| `players` | `PlayerLpData[]` | Per-player LP, tier label, and tier key |
+## Primitives — `components/ui/`
 
-Client component — toggles expanded state to show/hide individual player progress bars with rank emblems.
+| Component | Props of note |
+| --- | --- |
+| `Panel`, `PanelHeader` | `as`; header `title`, `icon`, `iconClassName`, `description`, `actions` |
+| `SectionHeader` | `title`, `icon`, `description`, `actions` |
+| `StatTile` | `label`, `value`, `sub`, `icon`, `size` (sm/md/lg), `variant` (card/plain), `valueClassName` |
+| `SegmentedControl` (client) | `options`, `value`, `onChange`, `variant` (pill/underline), `fullWidth`, `wrap` |
+| `LinkTabs` | URL tabs: `tabs` (`href`, `icon`, `locked`), `active` |
+| `Badge` | `tone` (neutral/primary/accent/win/loss/remake), `size` |
+| `ResultBadge` | `result`; also exports `RESULT_STRIPE`, `RESULT_TEXT` |
+| `RankNumber` | `position`, `variant` (best/worst) |
+| `CirBadge` | `score`, `detail` (letter/label), `size` |
+| `Meter`, `WinrateBar`, `TierProgressBar` | Bars; the tier bar takes `pins` (avatars on the ladder) |
+| `ProfileIcon` | `iconId`, `size`, `ringColor` (tier colour) |
+| `ChampionIcon`, `ItemsDisplay`, `KdaDisplay`, `MatchStats` | Game atoms |
+| `RankBadge`, `RankEmblem` | Tier + division + LP |
+| `RoleIcon` | Also exports `ROLE_META`, `ROLE_ORDER`, `roleLabel` |
+| `EmptyState`, `Skeleton`, `MoreButton`, `Spinner` | States |
 
-### BestOfSection
+## Dashboard — `components/dashboard/`
 
-Renders 8 "Best of the Challenge" cards in a responsive grid.
+`ChallengeHero` (team average, LP to go, track with player pins) · `Standings` + `StandingsRow` (client; filters in `leaderboardRows.ts`; columns appear by `@container` width) · `RoleCirLeaderboard` · `LoneWolf` ("Divas") · `BestOfSection` + `StatCard` (configs in `statCardConfigs.ts`).
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `best` | `BestOfChallenge` | Computed best-of stats object |
+## Player — `components/player/`
 
-Cards: Top Winrate, Top KDA, Top Damage, Best Champion, Most Avg Kills, Least Avg Deaths, Most Avg Assists, Top Kill Participation.
+`PlayerHero` · `RoleSpecialization` · `PlayerRadarChart` (math in `lib/playstyle.ts`) · `PlayerStatsGrid` (thresholds in `playerStatConfigs.tsx`) · `ChampionProficiency` · `MatchHistoryList` → `matchHistory/useMatchHistory`, `MatchFiltersBar`, `MatchRow`.
 
-### Leaderboard
+## Match — `components/match/`
 
-LP-based player ranking with rank badges and hot-streak indicators.
+`MatchHeader` · `MatchMVP` · `MatchTeamTable` → `ParticipantRow` · `MatchStats`. All read a `MatchView` from `lib/matchView.ts`.
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `players` | `PlayerRankedData[]` | All players' ranked data |
+## Team — `components/team/`
 
-### RoleLeaderboard
+`TeamOverview` · `BestRoster` (solver in `lib/bestRoster.ts`) · `FinalRankings` · `InternalRankings` (client; `rankingUtils.ts`) · `GroupMatchHistory` (client paging over server rows) · `RukawaFiles` → `rukawa/DossierPanel`, `SynergyMatrix`, `DrainList`, `LineupList`, `RoleImpact`, `BronzeWall`.
 
-Interactive winrate leaderboard with role selector tabs.
+## Records — `components/records/`
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `players` | `{ gameName, stats }[]` | Players with aggregated stats |
+`RecordsTab` (`RecordCard`, `PentakillCard`) · `CirTab` (`CountRanking`, `CirLeaderboards` → `CirLeaderboardCard`) · `DeltaTab` (`DeltaLeaderboardCard`, `DeltaConfig.ts`). Grouping and counting in `RecordData.ts`.
 
-Client component — user selects a role (Top, Jungle, Mid, ADC, Support) to see winrate rankings for that position.
+## Awards — `components/awards/`
 
-### PlayerCard
-
-Quick-glance card for a single player on the dashboard.
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `player` | `PlayerDashboardData` | Ranked data + last match info |
-| `version` | `string` | DDragon version for champion icons |
-
----
-
-## Player Components (`components/player/`)
-
-### PlayerHeader
-
-Displays player name, rank badge, LP, and winrate.
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `player` | `PlayerRankedData` | Player's ranked data |
-
-### AggregatedStats
-
-Grid of stat cards (KDA, CS/min, Damage, Vision Score).
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `stats` | `PlayerAggregatedStats` | Aggregated match stats |
-
-### ChampionStatsTable
-
-Sortable table of champion performance.
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `champions` | `ChampionStats[]` | Per-champion stats |
-| `version` | `string` | DDragon version for icons |
-
-Client component — click column headers (Games, Winrate, KDA, Avg DMG) to sort. Click again to reverse order.
-
-### RolePerformance
-
-Horizontal bar chart of games and winrate per role.
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `roleStats` | `RoleStats[]` | Per-role stats |
-
-### MatchHistoryList
-
-Paginated match history with "Load More" button.
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `puuid` | `string` | Player's PUUID |
-| `initialMatches` | `Match[]` | First page of matches (server-rendered) |
-| `version` | `string` | DDragon version |
-| `pageSize` | `number` | Matches per page (default 10) |
-
-Client component — fetches additional matches from `/api/matches` on button click. Only loads matches from the current season.
-
----
-
-## Team Components (`components/team/`)
-
-### TeamOverview
-
-Summary cards (team games, winrate, stack games, stack winrate) and team signature champions with icons.
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `players` | `{ gameName, stats }[]` | All players' aggregated stats |
-| `totalGroupMatches` | `number` | Matches where 2+ members played together |
-| `groupWins` | `number` | Wins in group matches |
-| `version` | `string` | DDragon version for champion icons |
-
-### InternalRankings
-
-Sortable player ranking by Winrate, KDA, or Avg Damage.
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `players` | `{ gameName, stats }[]` | All players' aggregated stats |
-
-Client component — toggle sort criteria with buttons.
-
-### GroupMatchHistory
-
-List of matches where 2+ tracked players played together.
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `groupMatches` | `{ match, players }[]` | Group match data |
-
----
-
-## Shared UI Components (`components/ui/`)
-
-### NavHeader
-Global navigation bar with Dashboard, Team Analytics links and a Players dropdown for quick navigation to any player's detail page.
-
-### ProgressBarSegmented
-Segmented progress bar from Iron to Challenger with proportional tier widths and color-matched fill. Supports `label`, `sublabel`, and `compact` mode.
-
-### RankEmblem
-SVG rank emblem icon colored by tier. Used next to tier labels in ChallengeHeader.
-
-### RankBadge
-Text badge showing tier, division, and LP.
-
-### ChampionIcon
-Renders a champion square icon from DDragon.
-
-### KdaDisplay
-Formatted K/D/A display with color coding.
-
-### WinrateBar
-Horizontal win/loss bar with optional label.
-
-### StatCard
-Generic stat card with label, value, sublabel, and icon.
-
-### Spinner
-Loading spinner with optional label. Used in `loading.tsx` files.
+`Nominations` → `AwardBoard` (client; podium `NomineeCard`, list `NomineeRow`, art `NomineeArt`) · `WinnersBoard` · `ScoreFormula`. Nominees are mapped to one display shape in `nomineeViews.ts` / `awardCategories.ts`.

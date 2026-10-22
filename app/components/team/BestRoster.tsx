@@ -1,21 +1,11 @@
-import type { CirRoleEntry } from "@/app/lib/db";
-import { POSITION_LABELS } from "@/app/data/constants";
-import { cn } from "@/app/lib/utils";
-import ProfileIcon from "@/app/components/ui/ProfileIcon";
-import { cirLabel } from "@/app/components/records/RecordData";
 import { Users } from "lucide-react";
-import { useMemo } from "react";
-
-type Position = "TOP" | "JUNGLE" | "MIDDLE" | "BOTTOM" | "UTILITY";
-const ROLES: Position[] = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
-
-const ROLE_ICONS: Record<Position, string> = {
-  TOP: "🛡️",
-  JUNGLE: "🌿",
-  MIDDLE: "⚡",
-  BOTTOM: "🏹",
-  UTILITY: "💠",
-};
+import type { CirRoleEntry } from "@/app/lib/db";
+import { BEST_ROSTER_MIN_GAMES, solveBestRoster } from "@/app/lib/bestRoster";
+import { getCirTier } from "@/app/lib/cirUtils";
+import { Panel, PanelHeader } from "@/app/components/ui/Panel";
+import ProfileIcon from "@/app/components/ui/ProfileIcon";
+import { ROLE_META } from "@/app/components/ui/RoleIcon";
+import { cn } from "@/app/lib/utils";
 
 interface BestRosterProps {
   entries: CirRoleEntry[];
@@ -23,176 +13,60 @@ interface BestRosterProps {
   version: string;
 }
 
-export default function BestRoster({
-  entries,
-  players,
-  version,
-}: BestRosterProps) {
+/** The ideal five: highest combined CIR, one player per role. */
+export default function BestRoster({ entries, players, version }: BestRosterProps) {
+  const slots = solveBestRoster(entries);
+  const filled = slots.filter((s) => s.pick);
+  if (filled.length === 0) return null;
+
   const iconMap = new Map(players.map((p) => [p.gameName, p.profileIconId]));
-
-  const bestRoster = useMemo(() => {
-    // 1. Organize candidates by role
-    const candidatesByRole = ROLES.map((role) => ({
-      role,
-      candidates: entries
-        .filter((e) => e.position === role && e.games >= 3)
-        .sort((a, b) => b.avgCir - a.avgCir),
-    }));
-
-    let maxTotalCir = -1;
-    const optimalAssignment: Record<string, CirRoleEntry | null> = {};
-
-    // 2. Recursive solver to find the global maximum
-    function solve(
-      roleIdx: number,
-      currentTotal: number,
-      currentMap: Map<string, CirRoleEntry>,
-      usedNames: Set<string>,
-    ) {
-      // Base Case: All roles considered
-      if (roleIdx === ROLES.length) {
-        if (currentTotal > maxTotalCir) {
-          maxTotalCir = currentTotal;
-          // Map back to role names
-          ROLES.forEach((r) => {
-            optimalAssignment[r] = currentMap.get(r) || null;
-          });
-        }
-        return;
-      }
-
-      const role = ROLES[roleIdx];
-      const roleData = candidatesByRole[roleIdx];
-
-      // Option A: Assign a player to this role
-      let branched = false;
-      for (const candidate of roleData.candidates) {
-        if (!usedNames.has(candidate.gameName)) {
-          usedNames.add(candidate.gameName);
-          currentMap.set(role, candidate);
-
-          solve(
-            roleIdx + 1,
-            currentTotal + candidate.avgCir,
-            currentMap,
-            usedNames,
-          );
-
-          // Backtrack
-          usedNames.delete(candidate.gameName);
-          currentMap.delete(role);
-          branched = true;
-        }
-      }
-
-      // Option B: Leave role empty (if no players available or all used elsewhere)
-      if (!branched) {
-        solve(roleIdx + 1, currentTotal, currentMap, usedNames);
-      }
-    }
-
-    solve(0, 0, new Map(), new Set());
-
-    return ROLES.map((role) => ({
-      role,
-      best: optimalAssignment[role] ?? null,
-    }));
-  }, [entries]);
-
-  const hasData = bestRoster.some((r) => r.best !== null);
-
-  if (!hasData) return null;
-
-  const avgTeamCir =
-    bestRoster
-      .filter((r) => r.best)
-      .reduce((s, r) => s + (r.best?.avgCir ?? 0), 0) /
-    bestRoster.filter((r) => r.best).length;
+  const teamAvg = filled.reduce((s, r) => s + r.pick!.avgCir, 0) / filled.length;
+  const teamTier = getCirTier(teamAvg);
 
   return (
-    <div>
-      <h2 className="mb-3 flex items-center justify-between gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-        <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-violet-400" />
-          Best Roster
-        </div>
-        <span className="text-xs font-normal text-zinc-600">
-          AVG CIR - min 3 games
-        </span>
-      </h2>
-
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 overflow-hidden divide-y divide-zinc-800/50">
-        {bestRoster.map(({ role, best }) => {
-          if (!best) {
-            return (
-              <div
-                key={role}
-                className="flex items-center gap-4 px-4 py-3 opacity-40"
-              >
-                <span className="w-6 text-center text-base">
-                  {ROLE_ICONS[role]}
-                </span>
-                <span className="w-16 text-xs font-semibold text-zinc-500 shrink-0">
-                  {POSITION_LABELS[role]}
-                </span>
-                <span className="flex-1 text-xs text-zinc-700 italic">
-                  No data yet
-                </span>
-              </div>
-            );
-          }
-
-          const { color, label } = cirLabel(best.avgCir);
-
+    <Panel>
+      <PanelHeader
+        icon={Users}
+        title="Best roster"
+        description={`Highest combined avg CIR · min. ${BEST_ROSTER_MIN_GAMES} games in role`}
+        actions={
+          <span className={cn("num font-display text-lg font-semibold", teamTier.text)} title="Lineup average CIR">
+            {teamAvg.toFixed(1)}
+          </span>
+        }
+      />
+      <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-5">
+        {slots.map(({ role, pick }) => {
+          const meta = ROLE_META[role];
+          const Icon = meta.icon;
+          const tier = pick ? getCirTier(pick.avgCir) : null;
           return (
             <div
               key={role}
-              className="flex items-center gap-2 md:gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors"
+              className="flex flex-col items-center gap-2 rounded-lg border border-border bg-raised/60 px-3 py-4 text-center"
             >
-              <span className="w-6 text-center text-base shrink-0">
-                {ROLE_ICONS[role]}
+              <span className={cn("flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider", meta.text)}>
+                <Icon className="size-3.5" />
+                {meta.label}
               </span>
-              <span className="w-16 text-xs font-semibold text-zinc-500 shrink-0">
-                {POSITION_LABELS[role]}
-              </span>
-              <ProfileIcon
-                iconId={iconMap.get(best.gameName) ?? null}
-                version={version}
-                size={28}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-zinc-200 truncate">
-                  {best.gameName}
-                </div>
-                <div className="text-xs text-zinc-600">{best.games} games</div>
-              </div>
-              <div className="text-right shrink-0">
-                <div className={cn("text-base font-bold tabular-nums", color)}>
-                  {best.avgCir.toFixed(1)}
-                </div>
-                <div className={cn("text-[10px] font-medium", color)}>
-                  {label}
-                </div>
-              </div>
+              {pick ? (
+                <>
+                  <ProfileIcon iconId={iconMap.get(pick.gameName) ?? null} version={version} size={48} />
+                  <span className="w-full truncate text-sm font-semibold">{pick.gameName}</span>
+                  <span className={cn("num font-display text-xl font-semibold leading-none", tier!.text)}>
+                    {pick.avgCir.toFixed(1)}
+                  </span>
+                  <span className="text-[11px] text-faint">
+                    {tier!.label} · {pick.games}G
+                  </span>
+                </>
+              ) : (
+                <span className="py-6 text-xs italic text-faint">Nobody qualifies</span>
+              )}
             </div>
           );
         })}
-
-        {/* Team avg CIR footer */}
-        <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-800/30">
-          <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Team Avg CIR
-          </span>
-          <span
-            className={cn(
-              "text-sm font-bold tabular-nums",
-              cirLabel(avgTeamCir).color,
-            )}
-          >
-            {avgTeamCir.toFixed(1)}
-          </span>
-        </div>
       </div>
-    </div>
+    </Panel>
   );
 }

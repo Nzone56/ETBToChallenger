@@ -1,28 +1,215 @@
 @import "tailwindcss";
 
-:root {
-  --background: #09090b;
-  --foreground: #fafafa;
-}
-
+/*
+ * ETB to Challenger — design tokens.
+ *
+ * Every colour in the app comes from here. Components use the semantic names
+ * (bg-card, text-muted-foreground, border-border, text-win, …), never raw
+ * Tailwind palette colours. Change a hue once, here, and the whole app follows.
+ */
 @theme inline {
+  /* Surfaces */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-raised: var(--raised);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-faint: var(--faint);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  /* Brand */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  /* The Rukawa Files dossier — one feature, one accent */
+  --color-dossier: var(--dossier);
+
+  /* Status — a state, never a series */
+  --color-win: var(--win);
+  --color-loss: var(--loss);
+  --color-remake: var(--remake);
+
+  /* Match sides */
+  --color-side-blue: var(--side-blue);
+  --color-side-red: var(--side-red);
+
+  /* Placements */
+  --color-medal-gold: var(--medal-gold);
+  --color-medal-silver: var(--medal-silver);
+  --color-medal-bronze: var(--medal-bronze);
+
+  /* CIR tiers (see lib/cirUtils.ts) */
+  --color-cir-legendary: var(--cir-legendary);
+  --color-cir-dominant: var(--cir-dominant);
+  --color-cir-great: var(--cir-great);
+  --color-cir-solid: var(--cir-solid);
+  --color-cir-average: var(--cir-average);
+  --color-cir-poor: var(--cir-poor);
+
+  /* CIR pillars — categorical identity */
+  --color-pillar-combat: var(--pillar-combat);
+  --color-pillar-utility: var(--pillar-utility);
+  --color-pillar-economy: var(--pillar-economy);
+  --color-pillar-pressure: var(--pillar-pressure);
+
+  /* Roles — categorical identity */
+  --color-role-top: var(--role-top);
+  --color-role-jungle: var(--role-jungle);
+  --color-role-mid: var(--role-mid);
+  --color-role-adc: var(--role-adc);
+  --color-role-support: var(--role-support);
+
+  /* Type */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-display: var(--font-chakra), var(--font-geist-sans), sans-serif;
+
+  /* Layout */
+  --container-app: 80rem;
+  --spacing-sidebar: 16rem;
+  --spacing-topbar: 3.5rem;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+:root {
+  color-scheme: dark;
+
+  --background: #0b0d12;
+  --foreground: #e8eaf0;
+  --card: #12151c;
+  --raised: #181c25;
+  --muted: #1d222c;
+  --muted-foreground: #8d95a7;
+  --faint: #5f6678;
+  --border: #232936;
+  --border-strong: #333b4b;
+
+  --primary: #e2b65c;
+  --primary-foreground: #1a1308;
+  --accent: #4cc6d6;
+  --dossier: #f0883e;
+
+  --win: #3ccf91;
+  --loss: #f0566e;
+  --remake: #7a8294;
+
+  --side-blue: #5b8cff;
+  --side-red: #f07a4a;
+
+  --medal-gold: #f2c94c;
+  --medal-silver: #c3cad6;
+  --medal-bronze: #cd8a52;
+
+  --cir-legendary: #f5c84b;
+  --cir-dominant: #f39a4b;
+  --cir-great: #3ccf91;
+  --cir-solid: #5aaef5;
+  --cir-average: #aab1c0;
+  --cir-poor: #f0566e;
+
+  --pillar-combat: #f2785c;
+  --pillar-utility: #5aaef5;
+  --pillar-economy: #e2b65c;
+  --pillar-pressure: #a77bf3;
+
+  --role-top: #6d8cff;
+  --role-jungle: #46c2a0;
+  --role-mid: #e8c15a;
+  --role-adc: #c27bf3;
+  --role-support: #7fd4e6;
 }
 
-/* ─── Animations ─── */
-@keyframes fade-in {
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    scrollbar-color: var(--border-strong) transparent;
+  }
+
+  body {
+    min-height: 100dvh;
+    background-color: var(--background);
+    /* Two faint glows — gold for the goal, hextech teal for the team. */
+    background-image:
+      radial-gradient(70rem 28rem at 85% -10%, rgb(226 182 92 / 0.07), transparent 60%),
+      radial-gradient(50rem 24rem at 10% -5%, rgb(76 198 214 / 0.05), transparent 60%);
+    background-attachment: fixed;
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: rgb(226 182 92 / 0.3);
+  }
+
+  /*
+   * Anything you can click says so. Tailwind v4's Preflight resets buttons to
+   * `cursor: default`; this is the one place that restores the pointer, so no
+   * component has to remember to. A clickable element missing the pointer
+   * means this selector list needs widening.
+   */
+  a[href],
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  summary,
+  select,
+  label[for] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 9999px;
+  }
+}
+
+/* Numbers that line up in columns. */
+@utility num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Horizontal scrollers (filter rows) without a visible bar. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/*
+ * Motion is one keyframe, applied by the container.
+ *
+ * `appear` fades and lifts one element; `appear-children` does the same to a
+ * container's direct children, staggered by nth-child here — no component
+ * takes a delay prop or knows it is being animated. The stagger stops at the
+ * eighth child so long lists don't trickle in.
+ */
+@keyframes appear {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(0.5rem);
   }
   to {
     opacity: 1;
@@ -30,162 +217,58 @@ body {
   }
 }
 
-@keyframes fade-in-scale {
+@utility appear {
+  animation: appear 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility appear-children {
+  & > * {
+    animation: appear 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  & > *:nth-child(2) {
+    animation-delay: 50ms;
+  }
+  & > *:nth-child(3) {
+    animation-delay: 100ms;
+  }
+  & > *:nth-child(4) {
+    animation-delay: 150ms;
+  }
+  & > *:nth-child(5) {
+    animation-delay: 200ms;
+  }
+  & > *:nth-child(6) {
+    animation-delay: 250ms;
+  }
+  & > *:nth-child(7) {
+    animation-delay: 300ms;
+  }
+  & > *:nth-child(n + 8) {
+    animation-delay: 350ms;
+  }
+}
+
+/* Progress fills grow from zero on first paint. */
+@keyframes grow-x {
   from {
-    opacity: 0;
-    transform: scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
+    transform: scaleX(0);
   }
 }
 
-@keyframes slide-down {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
+@utility grow-x {
+  transform-origin: left;
+  animation: grow-x 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Every animation in the app, off, for anyone who asked for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in {
-  animation: fade-in 0.4s ease-out both;
-}
-
-.animate-fade-in-scale {
-  animation: fade-in-scale 0.35s ease-out both;
-}
-
-.animate-slide-down {
-  animation: slide-down 0.25s ease-out both;
-}
-
-/* Stagger children — apply to parent, each child gets increasing delay */
-.stagger-children > * {
-  animation: fade-in 0.4s ease-out both;
-}
-.stagger-children > *:nth-child(1) {
-  animation-delay: 0ms;
-}
-.stagger-children > *:nth-child(2) {
-  animation-delay: 60ms;
-}
-.stagger-children > *:nth-child(3) {
-  animation-delay: 120ms;
-}
-.stagger-children > *:nth-child(4) {
-  animation-delay: 180ms;
-}
-.stagger-children > *:nth-child(5) {
-  animation-delay: 240ms;
-}
-.stagger-children > *:nth-child(6) {
-  animation-delay: 300ms;
-}
-.stagger-children > *:nth-child(7) {
-  animation-delay: 360ms;
-}
-.stagger-children > *:nth-child(8) {
-  animation-delay: 420ms;
-}
-.stagger-children > *:nth-child(9) {
-  animation-delay: 480ms;
-}
-.stagger-children > *:nth-child(10) {
-  animation-delay: 540ms;
-}
-
-/* Stagger grid items — for card grids, table rows, list items */
-.stagger-grid > * {
-  animation: fade-in-scale 0.35s ease-out both;
-}
-.stagger-grid > *:nth-child(1) {
-  animation-delay: 0ms;
-}
-.stagger-grid > *:nth-child(2) {
-  animation-delay: 40ms;
-}
-.stagger-grid > *:nth-child(3) {
-  animation-delay: 80ms;
-}
-.stagger-grid > *:nth-child(4) {
-  animation-delay: 120ms;
-}
-.stagger-grid > *:nth-child(5) {
-  animation-delay: 160ms;
-}
-.stagger-grid > *:nth-child(6) {
-  animation-delay: 200ms;
-}
-.stagger-grid > *:nth-child(7) {
-  animation-delay: 240ms;
-}
-.stagger-grid > *:nth-child(8) {
-  animation-delay: 280ms;
-}
-.stagger-grid > *:nth-child(9) {
-  animation-delay: 320ms;
-}
-.stagger-grid > *:nth-child(10) {
-  animation-delay: 360ms;
-}
-.stagger-grid > *:nth-child(n + 11) {
-  animation-delay: 400ms;
-}
-
-/* Stagger rows — for table rows, list items */
-.stagger-rows > * {
-  animation: fade-in 0.3s ease-out both;
-}
-.stagger-rows > *:nth-child(1) {
-  animation-delay: 0ms;
-}
-.stagger-rows > *:nth-child(2) {
-  animation-delay: 30ms;
-}
-.stagger-rows > *:nth-child(3) {
-  animation-delay: 60ms;
-}
-.stagger-rows > *:nth-child(4) {
-  animation-delay: 90ms;
-}
-.stagger-rows > *:nth-child(5) {
-  animation-delay: 120ms;
-}
-.stagger-rows > *:nth-child(6) {
-  animation-delay: 150ms;
-}
-.stagger-rows > *:nth-child(7) {
-  animation-delay: 180ms;
-}
-.stagger-rows > *:nth-child(8) {
-  animation-delay: 210ms;
-}
-.stagger-rows > *:nth-child(9) {
-  animation-delay: 240ms;
-}
-.stagger-rows > *:nth-child(10) {
-  animation-delay: 270ms;
-}
-.stagger-rows > *:nth-child(n + 11) {
-  animation-delay: 300ms;
-}
-
-/* Custom scrollbar for dark theme */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #18181b;
-}
-::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
 }
