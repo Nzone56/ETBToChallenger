@@ -42,7 +42,7 @@ Riot API → lib/sync.ts → Turso → lib/db.ts (unstable_cache, tag "db", 15 m
 
 - Expensive reads are wrapped in `unstable_cache` with the `db` tag. Payloads over ~2 MB (all matches of a player) use React `cache()` per request.
 - Raw Riot matches (~10 KB each) are reduced on the server before reaching client components.
-- Pages use `revalidate = 900` (ISR).
+- Pages render on request (none are prerendered at build); freshness comes from the 15-minute `unstable_cache`.
 
 ## Turso limits
 
